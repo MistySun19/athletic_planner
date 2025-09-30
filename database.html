@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>训练数据库管理</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="top-bar">
+    <h1>训练数据库管理</h1>
+    <nav>
+      <a href="index.html">表格制作</a>
+      <a href="database.html">数据库管理</a>
+    </nav>
+  </header>
+
+  <main class="page">
+    <section class="database-form">
+      <h2>新增训练类型</h2>
+      <div class="control-group">
+        <label for="new-type">类型名称：</label>
+        <input type="text" id="new-type" placeholder="例如：力量训练" />
+        <button id="add-type">添加类型</button>
+      </div>
+    </section>
+
+    <section class="database-types">
+      <h2>训练类型与动作</h2>
+      <div id="type-list" class="type-list"></div>
+    </section>
+  </main>
+
+  <template id="type-template">
+    <article class="type-card">
+      <header class="type-header">
+        <h3 data-field="type-name"></h3>
+        <div class="type-actions">
+          <button data-action="add-action">添加动作</button>
+          <button data-action="rename-type">重命名</button>
+          <button data-action="delete-type" class="danger">删除类型</button>
+        </div>
+      </header>
+      <ul data-field="action-list" class="action-list"></ul>
+    </article>
+  </template>
+
+  <template id="action-template">
+    <li class="action-item">
+      <span data-field="action-name"></span>
+      <button data-action="rename-action">重命名</button>
+      <button data-action="delete-action" class="danger">删除</button>
+    </li>
+  </template>
+
+  <script type="module" src="js/database.js"></script>
+</body>
+</html>
