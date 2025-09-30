@@ -1,22 +1,52 @@
-import { loadDatabase, saveDatabase, generateId } from "./storage.js";
+import { supabase } from "./supabaseClient.js";
 
 const typeInput = document.getElementById("new-type");
 const addTypeBtn = document.getElementById("add-type");
 const typeList = document.getElementById("type-list");
 const typeTemplate = document.getElementById("type-template");
 const actionTemplate = document.getElementById("action-template");
+const signOutBtn = document.getElementById("sign-out");
 
-let database = loadDatabase();
-
-function persist() {
-  saveDatabase(database);
-}
+let currentUser = null;
+let types = [];
 
 function clearElement(element) {
   if (!element) return;
   while (element.firstChild) {
     element.removeChild(element.firstChild);
   }
+}
+
+async function requireUser() {
+  const result = await supabase.auth.getUser();
+  if (result.error || !result.data?.user) {
+    window.location.href = "login.html";
+    throw result.error || new Error("未登录");
+  }
+  return result.data.user;
+}
+
+async function fetchTypes() {
+  const { data, error } = await supabase
+    .from("training_types")
+    .select("id, name, training_actions(id, name)")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error(error);
+    window.alert("加载训练类型失败：" + error.message);
+    types = [];
+  } else {
+    types = (data || []).map((type) => ({
+      id: type.id,
+      name: type.name,
+      actions: Array.isArray(type.training_actions)
+        ? type.training_actions.slice().sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+        : [],
+    }));
+  }
+
+  render();
 }
 
 function createActionElement(type, action) {
@@ -28,20 +58,33 @@ function createActionElement(type, action) {
 
   nameEl.textContent = action.name;
 
-  renameBtn.addEventListener("click", () => {
+  renameBtn.addEventListener("click", async () => {
     const nextName = window.prompt("重命名动作", action.name);
     if (!nextName) return;
-    action.name = nextName.trim();
-    if (!action.name) return;
-    nameEl.textContent = action.name;
-    persist();
+    const trimmed = nextName.trim();
+    if (!trimmed) return;
+    const { error } = await supabase
+      .from("training_actions")
+      .update({ name: trimmed })
+      .eq("id", action.id);
+    if (error) {
+      window.alert("重命名失败：" + error.message);
+      return;
+    }
+    fetchTypes();
   });
 
-  deleteBtn.addEventListener("click", () => {
+  deleteBtn.addEventListener("click", async () => {
     if (!window.confirm(`确定删除动作“${action.name}”吗？`)) return;
-    type.actions = type.actions.filter((item) => item.id !== action.id);
-    item.remove();
-    persist();
+    const { error } = await supabase
+      .from("training_actions")
+      .delete()
+      .eq("id", action.id);
+    if (error) {
+      window.alert("删除失败：" + error.message);
+      return;
+    }
+    fetchTypes();
   });
 
   return fragment;
@@ -62,32 +105,52 @@ function createTypeElement(type) {
     actionList.appendChild(createActionElement(type, action));
   });
 
-  addActionBtn.addEventListener("click", () => {
+  addActionBtn.addEventListener("click", async () => {
     const name = window.prompt(`为“${type.name}”添加动作`, "");
     if (!name) return;
     const trimmed = name.trim();
     if (!trimmed) return;
-    const action = { id: generateId("action"), name: trimmed };
-    type.actions.push(action);
-    actionList.appendChild(createActionElement(type, action));
-    persist();
+    const { error } = await supabase
+      .from("training_actions")
+      .insert({
+        name: trimmed,
+        type_id: type.id,
+        user_id: currentUser.id,
+      });
+    if (error) {
+      window.alert("添加动作失败：" + error.message);
+      return;
+    }
+    fetchTypes();
   });
 
-  renameBtn.addEventListener("click", () => {
+  renameBtn.addEventListener("click", async () => {
     const nextName = window.prompt("重命名训练类型", type.name);
     if (!nextName) return;
     const trimmed = nextName.trim();
     if (!trimmed) return;
-    type.name = trimmed;
-    nameEl.textContent = trimmed;
-    persist();
+    const { error } = await supabase
+      .from("training_types")
+      .update({ name: trimmed })
+      .eq("id", type.id);
+    if (error) {
+      window.alert("重命名失败：" + error.message);
+      return;
+    }
+    fetchTypes();
   });
 
-  deleteBtn.addEventListener("click", () => {
+  deleteBtn.addEventListener("click", async () => {
     if (!window.confirm(`确定删除训练类型“${type.name}”吗？`)) return;
-    database.types = database.types.filter((item) => item.id !== type.id);
-    render();
-    persist();
+    const { error } = await supabase
+      .from("training_types")
+      .delete()
+      .eq("id", type.id);
+    if (error) {
+      window.alert("删除失败：" + error.message);
+      return;
+    }
+    fetchTypes();
   });
 
   return fragment;
@@ -95,39 +158,36 @@ function createTypeElement(type) {
 
 function render() {
   clearElement(typeList);
-  if (!database.types.length) {
+  if (!types.length) {
     const emptyEl = document.createElement("p");
     emptyEl.className = "tip";
     emptyEl.textContent = "暂未添加训练类型";
     typeList.appendChild(emptyEl);
     return;
   }
-  database.types.forEach((type) => {
+  types.forEach((type) => {
     typeList.appendChild(createTypeElement(type));
   });
 }
 
-addTypeBtn.addEventListener("click", () => {
+addTypeBtn.addEventListener("click", async () => {
   const name = typeInput.value.trim();
   if (!name) {
     typeInput.focus();
     return;
   }
-  const exists = database.types.some((type) => type.name === name);
-  if (exists) {
-    window.alert("该训练类型已存在");
-    typeInput.focus();
+  const { error } = await supabase
+    .from("training_types")
+    .insert({
+      name,
+      user_id: currentUser.id,
+    });
+  if (error) {
+    window.alert("添加类型失败：" + error.message);
     return;
   }
-  const type = {
-    id: generateId("type"),
-    name,
-    actions: [],
-  };
-  database.types.push(type);
   typeInput.value = "";
-  render();
-  persist();
+  fetchTypes();
 });
 
 typeInput.addEventListener("keydown", (event) => {
@@ -137,4 +197,19 @@ typeInput.addEventListener("keydown", (event) => {
   }
 });
 
-render();
+if (signOutBtn) {
+  signOutBtn.addEventListener("click", async () => {
+    await supabase.auth.signOut();
+    window.location.href = "login.html";
+  });
+}
+
+async function init() {
+  currentUser = await requireUser();
+  fetchTypes();
+}
+
+init().catch((error) => {
+  console.error(error);
+  window.alert("初始化失败：" + (error?.message || "未知错误"));
+});

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 - 训练计划</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="auth-page">
+  <main class="auth-card">
+    <h1>登录训练计划平台</h1>
+    <p class="tip">还没有账号？输入邮箱和密码后点击注册即可创建。</p>
+    <form id="auth-form">
+      <label>
+        邮箱
+        <input type="email" id="email" required>
+      </label>
+      <label>
+        密码
+        <input type="password" id="password" minlength="6" required>
+      </label>
+      <div class="auth-actions">
+        <button type="submit" id="login-btn">登录</button>
+        <button type="button" id="signup-btn" class="secondary">注册</button>
+      </div>
+    </form>
+    <p id="auth-message" class="tip"></p>
+  </main>
+
+  <script type="module">
+    import { supabase } from "./js/supabaseClient.js";
+
+    const authForm = document.getElementById("auth-form");
+    const signupBtn = document.getElementById("signup-btn");
+    const messageEl = document.getElementById("auth-message");
+
+    function showMessage(text, isError = false) {
+      messageEl.textContent = text;
+      messageEl.classList.toggle("error", isError);
+    }
+
+    async function redirectIfLoggedIn() {
+      const { data, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error(error);
+        return;
+      }
+      if (data?.user) {
+        window.location.href = "index.html";
+      }
+    }
+
+    redirectIfLoggedIn();
+
+    authForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+
+      showMessage("正在登录…");
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        showMessage(error.message, true);
+        return;
+      }
+      showMessage("登录成功，正在跳转…");
+      window.location.href = "index.html";
+    });
+
+    signupBtn.addEventListener("click", async () => {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      if (!email || !password) {
+        showMessage("请输入邮箱和密码再注册", true);
+        return;
+      }
+      showMessage("正在注册…");
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        showMessage(error.message, true);
+        return;
+      }
+      if (data?.user) {
+        showMessage("注册成功，请查收验证邮件并登录");
+      }
+    });
+  </script>
+</body>
+</html>

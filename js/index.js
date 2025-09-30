@@ -1,4 +1,5 @@
-import { loadDatabase, loadSchedule, saveSchedule, generateId } from "./storage.js";
+import { supabase } from "./supabaseClient.js";
+import { generateId } from "./storage.js";
 
 var metrics = [
   { key: "sets", label: "组数" },
@@ -13,23 +14,31 @@ var addWeekBtn = document.getElementById("add-week");
 var setDaysBtn = document.getElementById("set-days");
 var addDayBtn = document.getElementById("add-day");
 var daysContainer = document.getElementById("days-container");
+var signOutBtn = document.getElementById("sign-out");
 
 if (!daysContainer) {
   throw new Error("days-container 未找到");
 }
 
-var database = loadDatabase();
-var schedule = loadSchedule();
+var currentUser = null;
+var scheduleRecordId = null;
 var activeForm = null;
-
-weekInput.value = String(schedule.weeks);
-dayInput.value = String(schedule.days);
+var database = { types: [] };
+var schedule = getDefaultSchedule();
 
 function clearElement(element) {
   if (!element) return;
   while (element.firstChild) {
     element.removeChild(element.firstChild);
   }
+}
+
+function getDefaultSchedule() {
+  return {
+    weeks: 4,
+    days: 5,
+    dayData: [],
+  };
 }
 
 function createWeekValues(count) {
@@ -48,11 +57,103 @@ function createDay(index) {
   };
 }
 
+async function requireUser() {
+  var result = await supabase.auth.getUser();
+  if (result.error || !result.data?.user) {
+    window.location.href = "login.html";
+    throw result.error || new Error("未登录");
+  }
+  return result.data.user;
+}
+
+async function loadTypes() {
+  var { data, error } = await supabase
+    .from("training_types")
+    .select("id, name, training_actions(id, name)")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error(error);
+    window.alert("加载训练类型失败：" + error.message);
+    database.types = [];
+    return;
+  }
+
+  database.types = (data || []).map(function (type) {
+    var actions = Array.isArray(type.training_actions)
+      ? type.training_actions.slice().sort(function (a, b) {
+          return (a.name || "").localeCompare(b.name || "");
+        })
+      : [];
+    return {
+      id: type.id,
+      name: type.name,
+      actions: actions.map(function (action) {
+        return { id: action.id, name: action.name };
+      }),
+    };
+  });
+}
+
+async function loadSchedule() {
+  var { data, error } = await supabase
+    .from("training_schedules")
+    .select("id, data")
+    .eq("user_id", currentUser.id)
+    .maybeSingle();
+
+  if (error && error.code !== "PGRST116") {
+    console.error(error);
+    window.alert("加载训练计划失败：" + error.message);
+    schedule = getDefaultSchedule();
+    scheduleRecordId = null;
+    return;
+  }
+
+  if (data) {
+    scheduleRecordId = data.id;
+    schedule = data.data || getDefaultSchedule();
+  } else {
+    scheduleRecordId = null;
+    schedule = getDefaultSchedule();
+  }
+}
+
+function persistSchedule() {
+  if (!currentUser) return;
+  var payload = {
+    user_id: currentUser.id,
+    data: schedule,
+  };
+  if (scheduleRecordId) {
+    payload.id = scheduleRecordId;
+  }
+
+  supabase
+    .from("training_schedules")
+    .upsert(payload, { onConflict: "id" })
+    .select("id")
+    .single()
+    .then(function (result) {
+      if (result.error) {
+        console.error(result.error);
+        window.alert("保存训练计划失败：" + result.error.message);
+        return;
+      }
+      if (result.data?.id) {
+        scheduleRecordId = result.data.id;
+      }
+    })
+    .catch(function (error) {
+      console.error(error);
+    });
+}
+
 function ensureScheduleStructure() {
   var changed = false;
 
   if (!schedule || typeof schedule !== "object") {
-    schedule = { weeks: 4, days: 5, dayData: [] };
+    schedule = getDefaultSchedule();
     changed = true;
   }
 
@@ -224,27 +325,9 @@ function syncWeekValues() {
   return changed;
 }
 
-function findTypeById(id) {
-  if (!id) return null;
-  for (var i = 0; i < database.types.length; i += 1) {
-    var type = database.types[i];
-    if (type && type.id === id) return type;
-  }
-  return null;
-}
-
-function findActionById(type, id) {
-  if (!type || !id) return null;
-  for (var i = 0; i < type.actions.length; i += 1) {
-    var action = type.actions[i];
-    if (action && action.id === id) return action;
-  }
-  return null;
-}
-
 function closeActiveForm() {
-  if (activeForm && activeForm.parent && activeForm.parent.contains(activeForm)) {
-    activeForm.parent.removeChild(activeForm);
+  if (activeForm && activeForm.parentElement) {
+    activeForm.parentElement.removeChild(activeForm);
   }
   activeForm = null;
 }
@@ -254,6 +337,21 @@ document.addEventListener("keydown", function (event) {
     closeActiveForm();
   }
 });
+
+function findType(typeId) {
+  for (var i = 0; i < database.types.length; i += 1) {
+    if (database.types[i].id === typeId) return database.types[i];
+  }
+  return null;
+}
+
+function findAction(type, actionId) {
+  if (!type) return null;
+  for (var i = 0; i < type.actions.length; i += 1) {
+    if (type.actions[i].id === actionId) return type.actions[i];
+  }
+  return null;
+}
 
 function handleMetricInput(event) {
   var input = event.target;
@@ -293,7 +391,7 @@ function handleMetricInput(event) {
   if (!values) return;
 
   values[metric] = input.value;
-  saveSchedule(schedule);
+  persistSchedule();
 }
 
 function buildActionPicker(container, type, selectedIds) {
@@ -310,7 +408,7 @@ function buildActionPicker(container, type, selectedIds) {
   if (!Array.isArray(type.actions) || type.actions.length === 0) {
     var empty = document.createElement("p");
     empty.className = "tip";
-    empty.textContent = "该类型暂无动作，请在数据库页添加";
+    empty.textContent = "该类型暂无动作，请先在数据库页添加";
     container.appendChild(empty);
     return;
   }
@@ -329,15 +427,12 @@ function buildActionPicker(container, type, selectedIds) {
 
     checkbox.addEventListener("change", function (evt) {
       var target = evt.target;
-      if (!target) return;
-      var actionId = target.value;
-      var index = selectedIds.indexOf(actionId);
+      var val = target.value;
+      var idx = selectedIds.indexOf(val);
       if (target.checked) {
-        if (index === -1) {
-          selectedIds.push(actionId);
-        }
-      } else if (index !== -1) {
-        selectedIds.splice(index, 1);
+        if (idx === -1) selectedIds.push(val);
+      } else if (idx !== -1) {
+        selectedIds.splice(idx, 1);
       }
     });
 
@@ -351,7 +446,7 @@ function buildActionPicker(container, type, selectedIds) {
 }
 
 function openEntryForm(dayIndex, entry) {
-  if (!Array.isArray(database.types) || database.types.length === 0) {
+  if (!database.types.length) {
     window.alert("请先在数据库页新增训练类型");
     return;
   }
@@ -385,7 +480,6 @@ function openEntryForm(dayIndex, entry) {
 
   for (var i = 0; i < database.types.length; i += 1) {
     var t = database.types[i];
-    if (!t) continue;
     var option = document.createElement("option");
     option.value = t.id;
     option.textContent = t.name;
@@ -393,9 +487,9 @@ function openEntryForm(dayIndex, entry) {
   }
 
   var initialTypeId = entry ? entry.typeId : "";
-  var initialType = findTypeById(initialTypeId);
-  if (initialType) {
-    typeSelect.value = initialType.id;
+  var selectedType = findType(initialTypeId);
+  if (selectedType) {
+    typeSelect.value = selectedType.id;
   }
 
   typeField.appendChild(typeSelect);
@@ -418,63 +512,55 @@ function openEntryForm(dayIndex, entry) {
   var actionsLabel = document.createElement("label");
   actionsLabel.textContent = "训练动作";
   actionsField.appendChild(actionsLabel);
-
   var actionPicker = document.createElement("div");
   actionPicker.className = "action-picker";
   actionsField.appendChild(actionPicker);
   form.appendChild(actionsField);
 
   var selectedIds = [];
-  var storedActionNames = {};
+  var storedNames = {};
 
   if (entry && Array.isArray(entry.actions)) {
     for (var j = 0; j < entry.actions.length; j += 1) {
       var action = entry.actions[j];
       if (!action) continue;
-      if (action.actionId) {
-        if (selectedIds.indexOf(action.actionId) === -1) {
-          selectedIds.push(action.actionId);
-        }
-        storedActionNames[action.actionId] = action.actionName;
+      if (action.actionId && selectedIds.indexOf(action.actionId) === -1) {
+        selectedIds.push(action.actionId);
+        storedNames[action.actionId] = action.actionName;
       }
     }
   }
 
-  buildActionPicker(actionPicker, initialType, selectedIds);
+  buildActionPicker(actionPicker, selectedType, selectedIds);
 
   typeSelect.addEventListener("change", function () {
-    var newType = findTypeById(typeSelect.value);
-    if (!newType) {
+    selectedType = findType(typeSelect.value);
+    if (!selectedType) {
       selectedIds = [];
       buildActionPicker(actionPicker, null, selectedIds);
       return;
     }
-
-    var validIds = [];
-    for (var idx = 0; idx < newType.actions.length; idx += 1) {
-      var action = newType.actions[idx];
-      if (action && selectedIds.indexOf(action.id) !== -1) {
-        validIds.push(action.id);
-      }
+    var available = {};
+    for (var idx = 0; idx < selectedType.actions.length; idx += 1) {
+      available[selectedType.actions[idx].id] = true;
     }
-    selectedIds = validIds;
-    buildActionPicker(actionPicker, newType, selectedIds);
+    selectedIds = selectedIds.filter(function (id) {
+      return available[id];
+    });
+    buildActionPicker(actionPicker, selectedType, selectedIds);
   });
 
   var buttonRow = document.createElement("div");
   buttonRow.className = "button-row";
-
   var saveBtn = document.createElement("button");
   saveBtn.type = "button";
   saveBtn.textContent = entry ? "保存" : "添加";
-
   var cancelBtn = document.createElement("button");
   cancelBtn.type = "button";
   cancelBtn.textContent = "取消";
   cancelBtn.addEventListener("click", function () {
     closeActiveForm();
   });
-
   buttonRow.appendChild(saveBtn);
   buttonRow.appendChild(cancelBtn);
   form.appendChild(buttonRow);
@@ -485,17 +571,16 @@ function openEntryForm(dayIndex, entry) {
       window.alert("请先选择训练类型");
       return;
     }
-
     if (selectedIds.length === 0) {
       window.alert("请至少选择一个动作");
       return;
     }
 
-    var type = findTypeById(typeId);
+    var type = findType(typeId);
     var day = schedule.dayData[dayIndex];
     if (!day) return;
 
-    var updatedActions = [];
+    var nextActions = [];
     var existingMap = {};
     if (entry && Array.isArray(entry.actions)) {
       for (var a = 0; a < entry.actions.length; a += 1) {
@@ -508,19 +593,19 @@ function openEntryForm(dayIndex, entry) {
 
     for (var b = 0; b < selectedIds.length; b += 1) {
       var actionId = selectedIds[b];
-      var actionDef = findActionById(type, actionId);
-      var existingAction = existingMap[actionId];
-      if (existingAction) {
-        existingAction.actionName = actionDef ? actionDef.name : existingAction.actionName;
-        if (!Array.isArray(existingAction.weekValues)) {
-          existingAction.weekValues = createWeekValues(schedule.weeks);
+      var actionDef = findAction(type, actionId);
+      var reuse = existingMap[actionId];
+      if (reuse) {
+        reuse.actionName = actionDef ? actionDef.name : reuse.actionName;
+        if (!Array.isArray(reuse.weekValues)) {
+          reuse.weekValues = createWeekValues(schedule.weeks);
         }
-        updatedActions.push(existingAction);
+        nextActions.push(reuse);
       } else {
-        updatedActions.push({
+        nextActions.push({
           id: generateId("entryAction"),
           actionId: actionId,
-          actionName: actionDef ? actionDef.name : (storedActionNames[actionId] || ""),
+          actionName: actionDef ? actionDef.name : storedNames[actionId] || "",
           weekValues: createWeekValues(schedule.weeks),
         });
       }
@@ -530,18 +615,18 @@ function openEntryForm(dayIndex, entry) {
       entry.typeId = typeId;
       entry.typeName = type ? type.name : entry.typeName;
       entry.groupLabel = groupInput.value.trim();
-      entry.actions = updatedActions;
+      entry.actions = nextActions;
     } else {
       day.entries.push({
         id: generateId("entry"),
         typeId: typeId,
         typeName: type ? type.name : "",
         groupLabel: groupInput.value.trim(),
-        actions: updatedActions,
+        actions: nextActions,
       });
     }
 
-    saveSchedule(schedule);
+    persistSchedule();
     closeActiveForm();
     renderDays();
   });
@@ -574,37 +659,37 @@ function renderDays() {
     title.textContent = day.title;
     toolbar.appendChild(title);
 
-    var toolbarButtons = document.createElement("div");
-    toolbarButtons.className = "day-toolbar-actions";
+    var actions = document.createElement("div");
+    actions.className = "day-toolbar-actions";
 
     var addBtn = document.createElement("button");
     addBtn.type = "button";
     addBtn.textContent = "添加条目";
-    addBtn.addEventListener("click", (function (index) {
+    addBtn.addEventListener("click", function (index) {
       return function () {
         openEntryForm(index, null);
       };
-    })(i));
+    }(i));
 
     var renameBtn = document.createElement("button");
     renameBtn.type = "button";
     renameBtn.textContent = "重命名训练日";
-    renameBtn.addEventListener("click", (function (index) {
+    renameBtn.addEventListener("click", function (index) {
       return function () {
         var current = schedule.dayData[index];
         if (!current) return;
         var next = window.prompt("请输入新的训练日名称", current.title);
         if (next && next.trim().length > 0) {
           current.title = next.trim();
-          saveSchedule(schedule);
+          persistSchedule();
           renderDays();
         }
       };
-    })(i));
+    }(i));
 
-    toolbarButtons.appendChild(addBtn);
-    toolbarButtons.appendChild(renameBtn);
-    toolbar.appendChild(toolbarButtons);
+    actions.appendChild(addBtn);
+    actions.appendChild(renameBtn);
+    toolbar.appendChild(actions);
     section.appendChild(toolbar);
 
     var formSlot = document.createElement("div");
@@ -618,7 +703,6 @@ function renderDays() {
     table.className = "sheet-table";
 
     var thead = document.createElement("thead");
-
     var dayRow = document.createElement("tr");
     var dayCell = document.createElement("th");
     dayCell.className = "day-heading-cell";
@@ -631,11 +715,9 @@ function renderDays() {
     var typeHeader = document.createElement("th");
     typeHeader.textContent = "训练类型";
     headerRow.appendChild(typeHeader);
-
     var groupHeader = document.createElement("th");
     groupHeader.textContent = "组别";
     headerRow.appendChild(groupHeader);
-
     var actionHeader = document.createElement("th");
     actionHeader.textContent = "训练动作";
     headerRow.appendChild(actionHeader);
@@ -681,17 +763,17 @@ function renderDays() {
     } else {
       for (var j = 0; j < day.entries.length; j += 1) {
         var entry = day.entries[j];
-        var type = findTypeById(entry.typeId);
+        var type = findType(entry.typeId);
         if (type && entry.typeName !== type.name) {
           entry.typeName = type.name;
           changed = true;
         }
 
-        var actions = Array.isArray(entry.actions) && entry.actions.length > 0
+        var actionsList = Array.isArray(entry.actions) && entry.actions.length > 0
           ? entry.actions
           : [];
-        if (actions.length === 0) {
-          actions.push({
+        if (actionsList.length === 0) {
+          actionsList.push({
             id: generateId("entryAction"),
             actionId: "",
             actionName: "",
@@ -700,17 +782,17 @@ function renderDays() {
           });
         }
 
-        for (var k = 0; k < actions.length; k += 1) {
-          var action = actions[k];
+        for (var k = 0; k < actionsList.length; k += 1) {
+          var action = actionsList[k];
           var row = document.createElement("tr");
 
           if (k === 0) {
             var typeCell = document.createElement("td");
             typeCell.className = "type-cell";
-            typeCell.rowSpan = actions.length;
+            typeCell.rowSpan = actionsList.length;
             typeCell.textContent = entry.typeName || "类型已删除";
             if (!type) {
-              typeCell.className += " missing";
+              typeCell.classList.add("missing");
             }
 
             var controlRow = document.createElement("div");
@@ -719,32 +801,28 @@ function renderDays() {
             var editBtn = document.createElement("button");
             editBtn.type = "button";
             editBtn.textContent = "编辑";
-            editBtn.addEventListener("click", (function (index, current) {
+            editBtn.addEventListener("click", function (index, current) {
               return function () {
                 openEntryForm(index, current);
               };
-            })(i, entry));
+            }(i, entry));
 
             var deleteBtn = document.createElement("button");
             deleteBtn.type = "button";
             deleteBtn.textContent = "删除";
             deleteBtn.className = "danger";
-            deleteBtn.addEventListener("click", (function (dayIndex, entryId) {
+            deleteBtn.addEventListener("click", function (dayIndex, entryId) {
               return function () {
                 if (!window.confirm("确定删除该训练条目吗？")) return;
                 var dayData = schedule.dayData[dayIndex];
                 if (!dayData) return;
-                var newEntries = [];
-                for (var idx = 0; idx < dayData.entries.length; idx += 1) {
-                  if (dayData.entries[idx].id !== entryId) {
-                    newEntries.push(dayData.entries[idx]);
-                  }
-                }
-                dayData.entries = newEntries;
-                saveSchedule(schedule);
+                dayData.entries = dayData.entries.filter(function (item) {
+                  return item.id !== entryId;
+                });
+                persistSchedule();
                 renderDays();
               };
-            })(i, entry.id));
+            }(i, entry.id));
 
             controlRow.appendChild(editBtn);
             controlRow.appendChild(deleteBtn);
@@ -753,18 +831,15 @@ function renderDays() {
 
             var groupCell = document.createElement("td");
             groupCell.className = "group-cell";
-            groupCell.rowSpan = actions.length;
+            groupCell.rowSpan = actionsList.length;
             groupCell.textContent = entry.groupLabel ? entry.groupLabel : "-";
             row.appendChild(groupCell);
           }
 
           var actionCell = document.createElement("td");
           actionCell.className = "action-cell";
-          var actionType = type;
-          if (!actionType && entry.typeId) {
-            actionType = findTypeById(entry.typeId);
-          }
-          var actionDef = findActionById(actionType, action.actionId);
+          var actionType = type || findType(entry.typeId);
+          var actionDef = findAction(actionType, action.actionId);
           if (actionDef && action.actionName !== actionDef.name) {
             action.actionName = actionDef.name;
             changed = true;
@@ -772,11 +847,11 @@ function renderDays() {
 
           if (action.placeholder) {
             actionCell.textContent = "请编辑条目以选择动作";
-            actionCell.className += " muted";
+            actionCell.classList.add("muted");
           } else {
             actionCell.textContent = action.actionName || (actionDef ? actionDef.name : "动作已删除");
             if (!actionDef && action.actionName) {
-              actionCell.className += " missing";
+              actionCell.classList.add("missing");
             }
           }
 
@@ -789,7 +864,7 @@ function renderDays() {
 
               if (action.placeholder) {
                 cell.textContent = "—";
-                cell.className += " muted";
+                cell.classList.add("muted");
               } else {
                 var metricKey = metrics[q].key;
                 var value = "";
@@ -829,7 +904,7 @@ function renderDays() {
   daysContainer.appendChild(fragment);
 
   if (changed) {
-    saveSchedule(schedule);
+    persistSchedule();
   }
 }
 
@@ -841,7 +916,7 @@ function applyWeekCount(value) {
   }
   schedule.weeks = parsed;
   weekInput.value = String(parsed);
-  saveSchedule(schedule);
+  persistSchedule();
   renderDays();
 }
 
@@ -853,7 +928,7 @@ function applyDayCount(value) {
   }
   schedule.days = parsed;
   dayInput.value = String(parsed);
-  saveSchedule(schedule);
+  persistSchedule();
   renderDays();
 }
 
@@ -887,11 +962,33 @@ dayInput.addEventListener("keydown", function (event) {
   }
 });
 
-function refreshDatabase() {
-  database = loadDatabase();
+window.addEventListener("focus", function () {
+  if (!currentUser) return;
+  loadTypes()
+    .then(renderDays)
+    .catch(function (error) {
+      console.error(error);
+    });
+});
+
+if (signOutBtn) {
+  signOutBtn.addEventListener("click", async function () {
+    await supabase.auth.signOut();
+    window.location.href = "login.html";
+  });
+}
+
+async function init() {
+  currentUser = await requireUser();
+  await Promise.all([loadTypes(), loadSchedule()]);
+  ensureScheduleStructure();
+  syncWeekValues();
+  weekInput.value = String(schedule.weeks);
+  dayInput.value = String(schedule.days);
   renderDays();
 }
 
-window.addEventListener("focus", refreshDatabase);
-
-renderDays();
+init().catch(function (error) {
+  console.error(error);
+  window.alert("初始化失败：" + (error?.message || "未知错误"));
+});
