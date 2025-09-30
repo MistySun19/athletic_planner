@@ -75,7 +75,14 @@
         return;
       }
       showMessage("正在注册…");
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      const redirectUrl = new URL("login.html", window.location.href).toString();
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+        },
+      });
       if (error) {
         showMessage(error.message, true);
         return;
