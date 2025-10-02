@@ -308,7 +308,7 @@ function updateStudentCount(count) {
 
 function togglePlannerAvailability(hasStudent) {
   if (plannerSections) {
-    plannerSections.classList.toggle("disabled", !hasStudent);
+    plannerSections.classList.toggle("hidden", !hasStudent);
   }
   if (studentGuard) {
     studentGuard.classList.toggle("hidden", hasStudent);

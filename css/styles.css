@@ -892,10 +892,10 @@ button.secondary:hover {
   background: #fff;
 }
 
-.planner-sections.disabled {
-  pointer-events: none;
-  opacity: 0.35;
-  filter: grayscale(0.15);
+.planner-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
 .student-guard {
