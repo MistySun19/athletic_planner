@@ -576,7 +576,15 @@ function resetProgressForWeek(weekIndex) {
     (day.entries || []).forEach((entry) => {
       (entry.actions || []).forEach((action) => {
         if (Array.isArray(action.weekValues) && action.weekValues[weekIndex]) {
-          delete action.weekValues[weekIndex].studentProgress;
+          const weekValue = action.weekValues[weekIndex];
+          delete weekValue.studentProgress;
+          if (Array.isArray(weekValue.setLog)) {
+            weekValue.setLog.forEach((setEntry) => {
+              if (setEntry && typeof setEntry === "object") {
+                setEntry.done = false;
+              }
+            });
+          }
         }
       });
     });
@@ -619,8 +627,43 @@ function applyProgressToSchedule(weekIndex, content) {
           rpe: record.rpe ?? "",
           sets,
         };
+        applySetCompletionToWeekValue(weekValue, sets);
       });
     });
+  });
+}
+
+function applySetCompletionToWeekValue(weekValue, setsCompletion) {
+  if (!weekValue || !Array.isArray(setsCompletion)) return;
+  ensureSetLogStructure(weekValue);
+  weekValue.setLog.forEach((setEntry, idx) => {
+    if (setEntry && typeof setEntry === "object") {
+      setEntry.done = Boolean(setsCompletion[idx]);
+    }
+  });
+}
+
+function ensureSetLogStructure(weekValue) {
+  if (!weekValue || typeof weekValue !== "object") return;
+  if (!Array.isArray(weekValue.setLog)) weekValue.setLog = [];
+  const totalSets = Number.parseInt(weekValue.sets, 10);
+  if (Number.isNaN(totalSets) || totalSets <= 0) {
+    weekValue.setLog = [];
+    return;
+  }
+  const defaultWeight = weekValue.weight || "";
+  while (weekValue.setLog.length < totalSets) {
+    weekValue.setLog.push({ done: false, weight: defaultWeight });
+  }
+  if (weekValue.setLog.length > totalSets) {
+    weekValue.setLog.length = totalSets;
+  }
+  weekValue.setLog.forEach((set) => {
+    if (typeof set.weight !== "string") {
+      set.weight = set.weight == null ? "" : String(set.weight);
+    }
+    if (typeof set.done !== "boolean") set.done = Boolean(set.done);
+    if (!set.weight && defaultWeight) set.weight = defaultWeight;
   });
 }
 
