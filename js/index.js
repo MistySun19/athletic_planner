@@ -176,15 +176,11 @@ function persistSchedule() {
     student_id: state.selectedStudentId,
     data: state.schedule,
   };
-  if (state.scheduleRecordId) {
-    payload.id = state.scheduleRecordId;
-  }
 
   supabase
     .from("student_schedules")
     .upsert(payload, { onConflict: "teacher_id,student_id" })
     .select("id")
-    .maybeSingle()
     .then(({ data, error }) => {
       if (error) {
         console.error("保存训练计划失败", error);
@@ -198,8 +194,8 @@ function persistSchedule() {
         }
         return;
       }
-      if (data?.id) {
-        state.scheduleRecordId = data.id;
+      if (Array.isArray(data) && data[0]?.id) {
+        state.scheduleRecordId = data[0].id;
       }
       setStudentSelectMessage("已保存该学生的计划。", "success");
     })
