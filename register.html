@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>注册 - 训练计划</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="auth-page">
+  <main class="auth-card">
+    <h1>注册新账户</h1>
+    <p class="tip">已有账户？<a href="login.html">返回登录</a>。</p>
+    <form id="register-form">
+      <label>
+        邮箱
+        <input type="email" id="register-email" required>
+      </label>
+      <label>
+        密码
+        <input type="password" id="register-password" minlength="6" required>
+      </label>
+      <label>
+        确认密码
+        <input type="password" id="register-password-confirm" minlength="6" required>
+      </label>
+      <label>
+        角色
+        <select id="register-role">
+          <option value="student">学生</option>
+          <option value="teacher">教师</option>
+        </select>
+      </label>
+      <div class="auth-actions">
+        <button type="button" id="send-code" class="secondary">发送验证码</button>
+      </div>
+      <label>
+        邮箱验证码
+        <input type="text" id="register-code" placeholder="请输入邮箱验证码" required>
+      </label>
+      <div class="auth-actions">
+        <button type="submit">完成注册</button>
+      </div>
+    </form>
+    <p id="register-message" class="tip"></p>
+  </main>
+
+  <script type="module" src="js/register.js"></script>
+</body>
+</html>
