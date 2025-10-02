@@ -1429,6 +1429,9 @@ button.secondary:hover {
 
 .value-cell {
   min-width: 90px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
 }
 
 .value-input {
@@ -1437,6 +1440,18 @@ button.secondary:hover {
   border: 1px solid var(--border);
   border-radius: 0.4rem;
   background: #ffffff;
+}
+
+.student-rpe-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(3, 201, 136, 0.15);
+  color: #038b5f;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .value-input:focus {

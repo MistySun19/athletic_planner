@@ -603,26 +603,33 @@ export function initGeneralPlanner({
                 const cell = document.createElement("td");
                 cell.className = "value-cell";
 
-                if (action.placeholder) {
-                  cell.textContent = "—";
-                  cell.classList.add("muted");
-                } else {
-                  const value = weekValue[metric.key] ?? "";
-                  const input = document.createElement("input");
-                  input.type = "text";
-                  input.value = value;
-                  input.className = "value-input";
-                  input.dataset.dayIndex = String(dayIndex);
-                  input.dataset.entryId = entry.id;
-                  input.dataset.actionId = action.id;
-                  input.dataset.weekIndex = String(weekIndex);
-                  input.dataset.metric = metric.key;
-                  input.addEventListener("input", handleMetricInput);
-                  cell.appendChild(input);
-                }
+              if (action.placeholder) {
+                cell.textContent = "—";
+                cell.classList.add("muted");
+              } else {
+                const value = weekValue[metric.key] ?? "";
+                const input = document.createElement("input");
+                input.type = "text";
+                input.value = value;
+                input.className = "value-input";
+                input.dataset.dayIndex = String(dayIndex);
+                input.dataset.entryId = entry.id;
+                input.dataset.actionId = action.id;
+                input.dataset.weekIndex = String(weekIndex);
+                input.dataset.metric = metric.key;
+                input.addEventListener("input", handleMetricInput);
+                cell.appendChild(input);
 
-                row.appendChild(cell);
-              });
+                if (metric.key === "rpe" && weekValue.studentProgress?.rpe) {
+                  const badge = document.createElement("span");
+                  badge.className = "student-rpe-badge";
+                  badge.textContent = `学生 RPE：${weekValue.studentProgress.rpe}`;
+                  cell.appendChild(badge);
+                }
+              }
+
+              row.appendChild(cell);
+            });
 
               const logCell = document.createElement("td");
               logCell.className = "set-log-cell";
