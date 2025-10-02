@@ -13,6 +13,7 @@ const progressMessage = document.getElementById("progress-message");
 let currentAssignment = null;
 let currentPlan = null;
 let currentUser = null;
+let currentPlanWeekNumber = 1;
 
 function showPlanMessage(message, isError = false) {
   if (!planMessage) return;
@@ -156,86 +157,190 @@ function renderProgressFields(planSnapshot, existingProgress) {
     return;
   }
 
-  const contentMap = new Map();
+  const progressMap = new Map();
   if (existingProgress && Array.isArray(existingProgress.content)) {
-    existingProgress.content.forEach((item) => {
-      if (Number.isInteger(item.dayIndex)) {
-        contentMap.set(item.dayIndex, item.note ?? "");
-      }
+    existingProgress.content.forEach((dayItem) => {
+      const dayIndex = dayItem.dayIndex;
+      (dayItem.actions || []).forEach((action) => {
+        const key = `${dayIndex}|${action.entryId}|${action.actionId}`;
+        progressMap.set(key, action);
+      });
     });
   }
 
-  planSnapshot.days.forEach((day, index) => {
-    const wrapper = document.createElement("div");
-    wrapper.className = "progress-day";
+  planSnapshot.days.forEach((day, dayIndex) => {
+    const section = document.createElement("section");
+    section.className = "progress-day";
 
-    const label = document.createElement("label");
-    label.htmlFor = `progress-day-${index}`;
-    label.textContent = day.title || `第 ${index + 1} 天`;
+    const dayTitle = document.createElement("h3");
+    dayTitle.textContent = day.title || `第 ${dayIndex + 1} 天`;
+    section.appendChild(dayTitle);
 
-    const textarea = document.createElement("textarea");
-    textarea.id = `progress-day-${index}`;
-    textarea.name = `day-${index}`;
-    textarea.placeholder = "请填写完成情况或反馈";
-    textarea.value = contentMap.get(index) ?? "";
+    if (!Array.isArray(day.entries) || !day.entries.length) {
+      const tip = document.createElement("p");
+      tip.className = "tip";
+      tip.textContent = "该日无需完成，老师未安排训练。";
+      section.appendChild(tip);
+      progressFields.appendChild(section);
+      return;
+    }
 
-    wrapper.appendChild(label);
-    wrapper.appendChild(textarea);
-    progressFields.appendChild(wrapper);
+    day.entries.forEach((entry) => {
+      const entryBlock = document.createElement("div");
+      entryBlock.className = "progress-entry";
+
+      const entryHeader = document.createElement("header");
+      entryHeader.className = "progress-entry-header";
+      const entryName = document.createElement("strong");
+      entryName.textContent = entry.typeName || "未指定类型";
+      entryHeader.appendChild(entryName);
+      if (entry.groupLabel) {
+        const badge = document.createElement("span");
+        badge.textContent = entry.groupLabel;
+        badge.className = "progress-entry-group";
+        entryHeader.appendChild(badge);
+      }
+      entryBlock.appendChild(entryHeader);
+
+      (entry.actions || []).forEach((action) => {
+        const actionBlock = document.createElement("div");
+        actionBlock.className = "progress-action";
+
+        const actionHeader = document.createElement("div");
+        actionHeader.className = "progress-action-header";
+        const actionName = document.createElement("h4");
+        actionName.textContent = action.actionName || "动作";
+        actionHeader.appendChild(actionName);
+
+        const metrics = action.weekValue || {};
+        const metricInfo = document.createElement("div");
+        metricInfo.className = "progress-action-metrics";
+        [
+          { key: "sets", label: "组数" },
+          { key: "reps", label: "次数" },
+          { key: "weight", label: "重量" },
+        ].forEach((metric) => {
+          if (!metrics[metric.key]) return;
+          const pill = document.createElement("span");
+          pill.textContent = `${metric.label}：${metrics[metric.key]}`;
+          metricInfo.appendChild(pill);
+        });
+        actionHeader.appendChild(metricInfo);
+        actionBlock.appendChild(actionHeader);
+
+        const progressKey = `${dayIndex}|${entry.id}|${action.id}`;
+        const recorded = progressMap.get(progressKey) || {};
+
+        const rpeWrap = document.createElement("label");
+        rpeWrap.className = "progress-rpe";
+        rpeWrap.textContent = "实际 RPE";
+        const rpeInput = document.createElement("input");
+        rpeInput.type = "number";
+        rpeInput.min = "0";
+        rpeInput.max = "10";
+        rpeInput.step = "0.5";
+        rpeInput.name = `rpe-${dayIndex}-${entry.id}-${action.id}`;
+        rpeInput.value = recorded.rpe ?? metrics.rpe ?? "";
+        rpeWrap.appendChild(rpeInput);
+        actionBlock.appendChild(rpeWrap);
+
+        const setCount = getSetCount(metrics);
+        if (setCount > 0) {
+          const setList = document.createElement("div");
+          setList.className = "progress-set-list";
+          for (let setIndex = 0; setIndex < setCount; setIndex += 1) {
+            const setId = `set-${dayIndex}-${entry.id}-${action.id}-${setIndex}`;
+            const setItem = document.createElement("label");
+            setItem.className = "progress-set-item";
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.name = setId;
+            checkbox.checked = Boolean(recorded.sets?.[setIndex]?.done);
+            const span = document.createElement("span");
+            span.textContent = `第 ${setIndex + 1} 组完成`;
+            setItem.appendChild(checkbox);
+            setItem.appendChild(span);
+            setList.appendChild(setItem);
+          }
+          actionBlock.appendChild(setList);
+        }
+
+        entryBlock.appendChild(actionBlock);
+      });
+
+      section.appendChild(entryBlock);
+    });
+
+    progressFields.appendChild(section);
   });
 }
 
-async function fetchLatestAssignment() {
+function getSetCount(metrics) {
+  if (!metrics) return 0;
+  if (Array.isArray(metrics.setLog) && metrics.setLog.length) {
+    return metrics.setLog.length;
+  }
+  const totalSets = Number.parseInt(metrics.sets, 10);
+  return Number.isNaN(totalSets) || totalSets < 0 ? 0 : totalSets;
+}
+
+async function fetchLatestPlan() {
   showPlanMessage("正在加载周计划…");
 
-  const { data: assignment, error } = await supabase
-    .from("weekly_plan_assignments")
-    .select("id, plan_id, status, created_at, teacher_id")
+  const { data: plan, error: planError } = await supabase
+    .from("weekly_plans")
+    .select("id, teacher_id, student_id, week_number, published_at, schedule_snapshot")
     .eq("student_id", currentUser.id)
-    .order("created_at", { ascending: false })
+    .order("week_number", { ascending: false })
+    .order("published_at", { ascending: false, nullsLast: true })
     .limit(1)
     .maybeSingle();
 
-  if (error) {
-    console.error("加载分配失败", error);
-    showPlanMessage("加载周计划失败：" + error.message, true);
+  if (planError) {
+    console.error("加载周计划失败", planError);
+    showPlanMessage("加载周计划失败：" + planError.message, true);
     return { assignment: null, plan: null, progress: null };
   }
 
-  if (!assignment) {
+  if (!plan) {
     showPlanMessage("老师尚未给你分配周计划。", false);
     return { assignment: null, plan: null, progress: null };
   }
 
-  const { data: plan, error: planError } = await supabase
-    .from("weekly_plans")
-    .select("id, week_number, published_at, schedule_snapshot")
-    .eq("id", assignment.plan_id)
+  const { data: assignment, error: assignmentError } = await supabase
+    .from("weekly_plan_assignments")
+    .select("id, status")
+    .eq("plan_id", plan.id)
+    .eq("student_id", currentUser.id)
     .maybeSingle();
 
-  if (planError) {
-    console.error("加载周计划详情失败", planError);
-    showPlanMessage("加载周计划详情失败：" + planError.message, true);
-    return { assignment, plan: null, progress: null };
+  if (assignmentError && assignmentError.code !== "PGRST116") {
+    console.error("加载周计划分发记录失败", assignmentError);
+    showPlanMessage("加载周计划失败：" + assignmentError.message, true);
+    return { assignment: null, plan, progress: null };
   }
 
-  const { data: progress, error: progressError } = await supabase
-    .from("weekly_progress")
-    .select("id, content, updated_at")
-    .eq("assignment_id", assignment.id)
-    .maybeSingle();
+  let progress = null;
+  if (assignment?.id) {
+    const { data: progressData, error: progressError } = await supabase
+      .from("weekly_progress")
+      .select("id, content, updated_at")
+      .eq("assignment_id", assignment.id)
+      .maybeSingle();
 
-  if (progressError && progressError.code !== "PGRST116") {
-    console.error("加载完成情况失败", progressError);
-    showPlanMessage("加载完成情况失败：" + progressError.message, true);
-    return { assignment, plan, progress: null };
+    if (progressError && progressError.code !== "PGRST116") {
+      console.error("加载完成情况失败", progressError);
+      showPlanMessage("加载完成情况失败：" + progressError.message, true);
+    } else {
+      progress = progressData ?? null;
+    }
   }
 
-  return { assignment, plan, progress: progress ?? null };
+  return { assignment: assignment ?? null, plan, progress };
 }
 
 async function refreshPlan() {
-  const { assignment, plan, progress } = await fetchLatestAssignment();
+  const { assignment, plan, progress } = await fetchLatestPlan();
   currentAssignment = assignment;
   currentPlan = plan;
 
@@ -250,6 +355,8 @@ async function refreshPlan() {
     ? new Date(plan.published_at).toLocaleString()
     : "";
 
+  currentPlanWeekNumber = weekNumber;
+
   if (planSubtitle) {
     planSubtitle.textContent = `第 ${weekNumber} 周 · 发布于 ${publishedAt || "未记录时间"}`;
   }
@@ -261,17 +368,41 @@ async function refreshPlan() {
 
 async function handleSubmit(event) {
   event.preventDefault();
-  if (!currentAssignment || !currentPlan) {
+  if (!currentPlan) {
     showProgressMessage("当前没有可提交的周计划。", true);
+    return;
+  }
+
+  if (!currentAssignment?.id) {
+    showProgressMessage("尚未收到老师发布的周计划，无法提交。", true);
     return;
   }
 
   const formData = new FormData(progressForm);
   const content = [];
 
-  (currentPlan.schedule_snapshot?.days || []).forEach((day, index) => {
-    const note = formData.get(`day-${index}`) ?? "";
-    content.push({ dayIndex: index, note: String(note).trim() });
+  (currentPlan.schedule_snapshot?.days || []).forEach((day, dayIndex) => {
+    const actions = [];
+    (day.entries || []).forEach((entry) => {
+      (entry.actions || []).forEach((action) => {
+        const rpeName = `rpe-${dayIndex}-${entry.id}-${action.id}`;
+        const rpeValue = formData.get(rpeName);
+        const metrics = action.weekValue || {};
+        const setCount = getSetCount(metrics);
+        const sets = [];
+        for (let setIndex = 0; setIndex < setCount; setIndex += 1) {
+          const setName = `set-${dayIndex}-${entry.id}-${action.id}-${setIndex}`;
+          sets.push({ index: setIndex, done: formData.has(setName) });
+        }
+        actions.push({
+          entryId: entry.id,
+          actionId: action.id,
+          rpe: rpeValue == null ? "" : String(rpeValue).trim(),
+          sets,
+        });
+      });
+    });
+    content.push({ dayIndex, actions });
   });
 
   const payload = {

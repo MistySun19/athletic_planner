@@ -346,15 +346,101 @@ body {
 .progress-day {
   display: flex;
   flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.progress-day h3 {
+  margin: 0;
+}
+
+.progress-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 0.6rem;
+  background: rgba(246, 247, 251, 0.7);
+}
+
+.progress-entry-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.progress-entry-group {
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(31, 42, 68, 0.1);
+  font-size: 0.75rem;
+}
+
+.progress-action {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.progress-action-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.progress-action-header h4 {
+  margin: 0;
+}
+
+.progress-action-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.progress-action-metrics span {
+  background: rgba(58, 110, 165, 0.1);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
+
+.progress-rpe {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-weight: 600;
+}
+
+.progress-rpe input {
+  width: 120px;
+  padding: 0.4rem 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+}
+
+.progress-set-list {
+  display: flex;
+  flex-direction: column;
   gap: 0.35rem;
 }
 
-.progress-day textarea {
-  min-height: 80px;
-  border-radius: 0.6rem;
-  border: 1px solid var(--border);
-  padding: 0.75rem;
-  resize: vertical;
+.progress-set-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
 }
 
 .student-admin-header {
