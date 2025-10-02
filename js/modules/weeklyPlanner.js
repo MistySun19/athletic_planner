@@ -7,6 +7,7 @@ export function initWeeklyPlanner({
   createWeekValues,
   persistSchedule,
   onScheduleChange = () => {},
+  onWeekChange = () => {},
   actions = {},
 }) {
   const {
@@ -99,7 +100,14 @@ export function initWeeklyPlanner({
       weekInput.min = "1";
       weekInput.max = String(Math.max(1, state.schedule.weeks || 1));
     }
-    render();
+    const maybePromise = onWeekChange(selectedWeek);
+    if (maybePromise && typeof maybePromise.then === "function") {
+      maybePromise.then(() => {
+        render();
+      });
+    } else {
+      render();
+    }
   }
 
   function notifyChange(shouldRerender = false) {
@@ -270,6 +278,42 @@ export function initWeeklyPlanner({
             metricGrid.appendChild(label);
           });
           actionBlock.appendChild(metricGrid);
+
+          const progressInfo = document.createElement("div");
+          progressInfo.className = "weekly-student-progress";
+          const studentProgress = weekValue.studentProgress;
+          if (studentProgress && (studentProgress.rpe || (studentProgress.sets && studentProgress.sets.length))) {
+            const headerLine = document.createElement("div");
+            headerLine.className = "progress-summary-header";
+            const title = document.createElement("strong");
+            title.textContent = "学生反馈";
+            headerLine.appendChild(title);
+            if (studentProgress.rpe) {
+              const rpeTag = document.createElement("span");
+              rpeTag.className = "progress-summary-rpe";
+              rpeTag.textContent = `RPE：${studentProgress.rpe}`;
+              headerLine.appendChild(rpeTag);
+            }
+            progressInfo.appendChild(headerLine);
+
+            if (Array.isArray(studentProgress.sets) && studentProgress.sets.length) {
+              const setList = document.createElement("ul");
+              setList.className = "progress-summary-sets";
+              studentProgress.sets.forEach((done, idx) => {
+                const item = document.createElement("li");
+                item.textContent = `第 ${idx + 1} 组：${done ? "已完成" : "未完成"}`;
+                item.classList.toggle("done", Boolean(done));
+                setList.appendChild(item);
+              });
+              progressInfo.appendChild(setList);
+            }
+          } else {
+            const empty = document.createElement("p");
+            empty.className = "tip";
+            empty.textContent = "学生尚未提交完成情况。";
+            progressInfo.appendChild(empty);
+          }
+          actionBlock.appendChild(progressInfo);
 
           const setLogWrapper = document.createElement("div");
           setLogWrapper.className = "weekly-set-log";

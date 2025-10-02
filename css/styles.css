@@ -310,6 +310,46 @@ body {
   gap: 0.5rem;
 }
 
+.weekly-student-progress {
+  border-top: 1px dashed var(--border);
+  padding-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.progress-summary-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.progress-summary-header strong {
+  font-size: 0.95rem;
+}
+
+.progress-summary-rpe {
+  background: rgba(3, 201, 136, 0.12);
+  color: #038b5f;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.progress-summary-sets {
+  margin: 0;
+  padding-left: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.progress-summary-sets li.done {
+  color: #038b5f;
+}
+
 .plan-action-item h4 {
   margin: 0;
   font-size: 1rem;

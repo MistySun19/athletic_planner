@@ -20,6 +20,8 @@ const state = {
   profile: null,
   selectedStudentId: "",
   students: [],
+  progressByWeek: new Map(),
+  currentWeekIndex: 0,
 };
 
 const elementsGeneral = {
@@ -81,6 +83,7 @@ weeklyPlanner = initWeeklyPlanner({
   onScheduleChange: () => {
     generalPlanner.render();
   },
+  onWeekChange: handleWeekChange,
 });
 
 teacherStudentManager = initTeacherStudents({
@@ -399,6 +402,8 @@ function handleStudentsChange(students) {
 async function setSelectedStudent(studentId, { silent = false } = {}) {
   const normalizedId = studentId || "";
   state.selectedStudentId = normalizedId;
+  state.progressByWeek = new Map();
+  state.currentWeekIndex = weeklyPlanner?.getSelectedWeek?.() ?? 0;
   togglePlannerAvailability(Boolean(normalizedId));
 
   if (elementsStudentManager.select && elementsStudentManager.select.value !== normalizedId) {
@@ -424,6 +429,17 @@ async function setSelectedStudent(studentId, { silent = false } = {}) {
   }
 
   await loadScheduleForStudent(normalizedId);
+  if (normalizedId) {
+    const weekIndex = weeklyPlanner?.getSelectedWeek?.() ?? 0;
+    state.currentWeekIndex = weekIndex;
+    await loadProgressForWeek(weekIndex);
+    weeklyPlanner?.render?.();
+  }
+}
+
+function handleWeekChange(weekIndex) {
+  state.currentWeekIndex = weekIndex;
+  return loadProgressForWeek(weekIndex);
 }
 
 function bindStudentControls() {
@@ -545,9 +561,138 @@ async function publishCurrentStudentWeek() {
     }
 
     setStudentSelectMessage(`已发布第 ${weekIndex + 1} 周计划给该学生。`, "success");
+    state.progressByWeek.delete(weekIndex);
+    await loadProgressForWeek(weekIndex);
+    weeklyPlanner?.render?.();
   } catch (error) {
     console.error("发布周计划失败", error);
     setStudentSelectMessage(error?.message || "发布失败", "error");
+  }
+}
+
+function resetProgressForWeek(weekIndex) {
+  if (!state.schedule?.dayData) return;
+  state.schedule.dayData.forEach((day) => {
+    (day.entries || []).forEach((entry) => {
+      (entry.actions || []).forEach((action) => {
+        if (Array.isArray(action.weekValues) && action.weekValues[weekIndex]) {
+          delete action.weekValues[weekIndex].studentProgress;
+        }
+      });
+    });
+  });
+}
+
+function applyProgressToSchedule(weekIndex, content) {
+  resetProgressForWeek(weekIndex);
+  if (!Array.isArray(content) || !content.length) return;
+
+  const progressMap = new Map();
+  content.forEach((dayItem) => {
+    if (!dayItem) return;
+    const dayIndex = Number.parseInt(dayItem.dayIndex, 10);
+    if (Number.isNaN(dayIndex)) return;
+    (dayItem.actions || []).forEach((actionItem) => {
+      if (!actionItem) return;
+      const key = `${dayIndex}|${actionItem.entryId}|${actionItem.actionId}`;
+      progressMap.set(key, actionItem);
+    });
+  });
+
+  if (!state.schedule?.dayData) return;
+  state.schedule.dayData.forEach((day, dayIndex) => {
+    (day.entries || []).forEach((entry) => {
+      (entry.actions || []).forEach((action) => {
+        if (!Array.isArray(action.weekValues)) return;
+        const weekValue = action.weekValues[weekIndex];
+        if (!weekValue) return;
+        const key = `${dayIndex}|${entry.id}|${action.id}`;
+        const record = progressMap.get(key);
+        if (!record) {
+          delete weekValue.studentProgress;
+          return;
+        }
+        const sets = Array.isArray(record.sets)
+          ? record.sets.map((item) => Boolean(item?.done))
+          : [];
+        weekValue.studentProgress = {
+          rpe: record.rpe ?? "",
+          sets,
+        };
+      });
+    });
+  });
+}
+
+async function loadProgressForWeek(weekIndex) {
+  if (!state.schedule) return;
+  if (!state.selectedStudentId) {
+    resetProgressForWeek(weekIndex);
+    return;
+  }
+
+  try {
+    const { data: plan, error: planError } = await supabase
+      .from("weekly_plans")
+      .select("id")
+      .eq("teacher_id", state.currentUser.id)
+      .eq("student_id", state.selectedStudentId)
+      .eq("week_number", weekIndex + 1)
+      .maybeSingle();
+
+    if (planError) {
+      console.error("加载周计划详情失败", planError);
+      state.progressByWeek.set(weekIndex, null);
+      applyProgressToSchedule(weekIndex, null);
+      return;
+    }
+
+    if (!plan) {
+      state.progressByWeek.set(weekIndex, null);
+      applyProgressToSchedule(weekIndex, null);
+      return;
+    }
+
+    const { data: assignment, error: assignmentError } = await supabase
+      .from("weekly_plan_assignments")
+      .select("id")
+      .eq("plan_id", plan.id)
+      .eq("student_id", state.selectedStudentId)
+      .maybeSingle();
+
+    if (assignmentError && assignmentError.code !== "PGRST116") {
+      console.error("加载周计划分发记录失败", assignmentError);
+      state.progressByWeek.set(weekIndex, null);
+      applyProgressToSchedule(weekIndex, null);
+      return;
+    }
+
+    if (!assignment?.id) {
+      state.progressByWeek.set(weekIndex, null);
+      applyProgressToSchedule(weekIndex, null);
+      return;
+    }
+
+    const { data: progress, error: progressError } = await supabase
+      .from("weekly_progress")
+      .select("content")
+      .eq("assignment_id", assignment.id)
+      .maybeSingle();
+
+    if (progressError && progressError.code !== "PGRST116") {
+      console.error("加载学生完成情况失败", progressError);
+      state.progressByWeek.set(weekIndex, null);
+      applyProgressToSchedule(weekIndex, null);
+      return;
+    }
+
+    const content = progress?.content || null;
+    state.progressByWeek.set(weekIndex, content);
+    applyProgressToSchedule(weekIndex, content);
+  } catch (error) {
+    console.error("加载学生完成情况失败", error);
+    state.progressByWeek.set(weekIndex, null);
+    applyProgressToSchedule(weekIndex, null);
   }
 }
 
