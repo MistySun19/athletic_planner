@@ -123,12 +123,42 @@ body {
 
 .controls,
 .database-form,
-.database-types {
+.database-types,
+.student-admin-card {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 0.75rem;
   padding: 1.5rem;
   box-shadow: 0 12px 24px rgba(31, 42, 68, 0.06);
+}
+
+.student-admin-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.student-admin-header {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.student-admin-header h2 {
+  margin: 0;
+}
+
+.student-admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.student-email {
+  word-break: break-all;
 }
 
 .controls {
@@ -575,6 +605,83 @@ button.danger:hover {
 .week-nav {
   display: flex;
   gap: 0.5rem;
+}
+
+.student-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px dashed var(--border);
+  border-radius: 0.75rem;
+  background: #f9fbff;
+}
+
+.bind-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.bind-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-weight: 600;
+  flex: 1 1 240px;
+}
+
+.bind-form input {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+
+.bind-form button {
+  height: 40px;
+  padding: 0.4rem 1.1rem;
+}
+
+.student-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.student-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  background: #fff;
+}
+
+.student-item-info {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.student-item-info strong {
+  font-size: 0.95rem;
+}
+
+.student-item-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.student-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.student-actions button {
+  padding: 0.45rem 0.9rem;
 }
 
 .weekly-container {

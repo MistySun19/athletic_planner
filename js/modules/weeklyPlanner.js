@@ -7,14 +7,32 @@ export function initWeeklyPlanner({
   createWeekValues,
   persistSchedule,
   onScheduleChange = () => {},
+  actions = {},
 }) {
-  const { weekInput, prevBtn, nextBtn, container } = elements;
+  const {
+    weekInput,
+    prevBtn,
+    nextBtn,
+    container,
+    bindCodeInput,
+    bindNameInput,
+    bindButton,
+    studentListEl,
+    syncButton,
+  } = elements;
+
+  const {
+    bindStudentByEmail = async () => ({ success: false, message: "未实现" }),
+    removeStudent = async () => ({ success: false, message: "未实现" }),
+    syncWeek = async () => ({ success: false, message: "未实现" }),
+  } = actions;
 
   if (!container) {
     return { render: () => {}, setWeek: () => {} };
   }
 
   let selectedWeek = 0;
+  const selectedStudentIds = new Set();
 
   function normalizeWeekValue(weekValue) {
     if (!weekValue || typeof weekValue !== "object") return;
@@ -160,6 +178,8 @@ export function initWeeklyPlanner({
       weekInput.max = String(maxWeeks);
       weekInput.value = String(selectedWeek + 1);
     }
+
+    renderStudents();
 
     clearElement(container);
 

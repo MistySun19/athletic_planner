@@ -12,6 +12,7 @@
     <nav>
       <a href="index.html">表格制作</a>
       <a href="database.html">数据库管理</a>
+      <a href="students.html">学生管理</a>
       <button id="sign-out" type="button">退出登录</button>
     </nav>
   </header>
@@ -57,6 +58,26 @@
             <button id="weekly-next" type="button">下一周</button>
           </div>
         </header>
+
+        <section class="student-manager">
+          <form class="bind-form" id="bind-form">
+            <label>
+              学生邮箱
+              <input
+                type="email"
+                id="student-email"
+                placeholder="student@example.com"
+                required
+              />
+            </label>
+            <button id="bind-student" type="submit">添加学生</button>
+          </form>
+          <div id="student-list" class="student-list"></div>
+          <div class="student-actions">
+            <button id="sync-week" type="button">同步当前周计划</button>
+          </div>
+        </section>
+
         <div id="weekly-container" class="weekly-container"></div>
       </section>
     </section>
