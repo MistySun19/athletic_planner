@@ -434,12 +434,16 @@ async function setSelectedStudent(studentId, { silent = false } = {}) {
     state.currentWeekIndex = weekIndex;
     await loadProgressForWeek(weekIndex);
     weeklyPlanner?.render?.();
+    generalPlanner.render();
   }
 }
 
 function handleWeekChange(weekIndex) {
   state.currentWeekIndex = weekIndex;
-  return loadProgressForWeek(weekIndex);
+  return loadProgressForWeek(weekIndex).then(() => {
+    generalPlanner.render();
+    weeklyPlanner?.render?.();
+  });
 }
 
 function bindStudentControls() {
