@@ -179,8 +179,6 @@ export function initWeeklyPlanner({
       weekInput.value = String(selectedWeek + 1);
     }
 
-    renderStudents();
-
     clearElement(container);
 
     if (!schedule.dayData || !schedule.dayData.length) {
