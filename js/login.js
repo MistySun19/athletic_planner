@@ -55,7 +55,9 @@ async function handleLogin(event) {
   try {
     profile = await fetchProfile(user.id);
     if (!profile) {
-      profile = await upsertProfile(user);
+      const preferredRole =
+        user.user_metadata?.role || user.user_metadata?.requested_role || ROLE.student;
+      profile = await upsertProfile(user, preferredRole);
     }
   } catch (profileError) {
     console.error(profileError);
@@ -77,7 +79,9 @@ async function redirectIfLoggedIn() {
     if (!data?.user) return;
     let profile = await fetchProfile(data.user.id);
     if (!profile) {
-      profile = await upsertProfile(data.user);
+      const preferredRole =
+        data.user.user_metadata?.role || data.user.user_metadata?.requested_role || ROLE.student;
+      profile = await upsertProfile(data.user, preferredRole);
     }
     await redirectByRole(profile);
   } catch (error) {
