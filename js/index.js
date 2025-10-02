@@ -51,6 +51,9 @@ const elementsStudentManager = {
 
 const adminLink = document.getElementById("admin-link");
 const requestAdminBtn = document.getElementById("request-admin");
+const studentCountEl = document.getElementById("student-count");
+const studentGuard = document.getElementById("student-guard");
+const plannerSections = document.querySelector(".planner-sections");
 
 let weeklyPlanner;
 let teacherStudentManager;
@@ -128,6 +131,10 @@ async function init() {
   ensureScheduleStructure(state.schedule);
   syncWeekValues(state.schedule);
   updateScheduleInputs();
+  togglePlannerAvailability(Boolean(state.selectedStudentId));
+  if (!state.selectedStudentId) {
+    setStudentSelectMessage("请选择学生以开始制定计划。", "error");
+  }
 
   generalPlanner.render();
   if (weeklyPlanner) weeklyPlanner.render();
@@ -217,6 +224,7 @@ async function loadScheduleForStudent(studentId) {
     generalPlanner.render();
     if (weeklyPlanner) weeklyPlanner.render();
     setStudentSelectMessage("请选择学生以开始制定计划。", "error");
+    togglePlannerAvailability(false);
     return;
   }
 
@@ -269,6 +277,7 @@ async function loadScheduleForStudent(studentId) {
 
   const currentStudent = state.students.find((item) => item.student_id === studentId);
   setStudentSelectMessage(`当前学生：${formatStudentLabel(currentStudent)}`);
+  togglePlannerAvailability(true);
 }
 
 function updateScheduleInputs() {
@@ -292,6 +301,45 @@ function setStudentSelectMessage(message, type = "info") {
   el.classList.toggle("success", type === "success");
 }
 
+function updateStudentCount(count) {
+  if (!studentCountEl) return;
+  studentCountEl.textContent = `共 ${count} 名学生`;
+}
+
+function togglePlannerAvailability(hasStudent) {
+  if (plannerSections) {
+    plannerSections.classList.toggle("disabled", !hasStudent);
+  }
+  if (studentGuard) {
+    studentGuard.classList.toggle("hidden", hasStudent);
+  }
+
+  const generalControls = [
+    elementsGeneral.weekInput,
+    elementsGeneral.dayInput,
+    elementsGeneral.setWeeksBtn,
+    elementsGeneral.addWeekBtn,
+    elementsGeneral.setDaysBtn,
+    elementsGeneral.addDayBtn,
+  ];
+  generalControls.forEach((el) => {
+    if (el) el.disabled = !hasStudent;
+  });
+
+  const weeklyControls = [
+    elementsWeekly.weekInput,
+    elementsWeekly.prevBtn,
+    elementsWeekly.nextBtn,
+  ];
+  weeklyControls.forEach((el) => {
+    if (el) el.disabled = !hasStudent;
+  });
+
+  if (elementsStudentManager.publishButton) {
+    elementsStudentManager.publishButton.disabled = !hasStudent;
+  }
+}
+
 function formatStudentLabel(student) {
   if (!student) return "未命名学生";
   const profile = student.profile;
@@ -303,6 +351,7 @@ function formatStudentLabel(student) {
 
 function handleStudentsChange(students) {
   state.students = students;
+  updateStudentCount(students.length);
   const select = elementsStudentManager.select;
   const publishBtn = elementsStudentManager.publishButton;
 
@@ -333,6 +382,7 @@ function handleStudentsChange(students) {
   if (!students.length) {
     setSelectedStudent("", { silent: true });
     setStudentSelectMessage("尚未绑定学生，请先添加。", "error");
+    togglePlannerAvailability(false);
     return;
   }
 
@@ -342,12 +392,14 @@ function handleStudentsChange(students) {
   } else {
     const currentStudent = students.find((item) => item.student_id === state.selectedStudentId);
     setStudentSelectMessage(`当前学生：${formatStudentLabel(currentStudent)}`);
+    togglePlannerAvailability(true);
   }
 }
 
 async function setSelectedStudent(studentId, { silent = false } = {}) {
   const normalizedId = studentId || "";
   state.selectedStudentId = normalizedId;
+  togglePlannerAvailability(Boolean(normalizedId));
 
   if (elementsStudentManager.select && elementsStudentManager.select.value !== normalizedId) {
     elementsStudentManager.select.value = normalizedId;

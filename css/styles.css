@@ -854,6 +854,30 @@ button.secondary:hover {
   background: #f9fbff;
 }
 
+.student-control-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--card);
+  box-shadow: 0 12px 24px rgba(31, 42, 68, 0.06);
+}
+
+.student-control-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.student-control-header h2 {
+  margin: 0;
+}
+
 .student-select {
   display: flex;
   flex-direction: column;
@@ -866,6 +890,25 @@ button.secondary:hover {
   border: 1px solid var(--border);
   border-radius: 0.5rem;
   background: #fff;
+}
+
+.planner-sections.disabled {
+  pointer-events: none;
+  opacity: 0.35;
+  filter: grayscale(0.15);
+}
+
+.student-guard {
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.25rem;
+  border-radius: 0.75rem;
+  border: 1px dashed var(--border);
+  background: rgba(255, 245, 225, 0.7);
+  color: #8a6d3b;
+}
+
+.student-guard.hidden {
+  display: none;
 }
 
 .bind-form {
