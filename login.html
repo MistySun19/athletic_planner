@@ -9,7 +9,7 @@
 <body class="auth-page">
   <main class="auth-card">
     <h1>登录训练计划平台</h1>
-    <p class="tip">还没有账号？输入邮箱和密码后点击注册即可创建。</p>
+    <p class="tip">还没有账号？输入邮箱和密码后点击注册即可立即使用。</p>
     <form id="auth-form">
       <label>
         邮箱
@@ -75,21 +75,26 @@
         return;
       }
       showMessage("正在注册…");
-      const redirectUrl = new URL("login.html", window.location.href).toString();
-      const { data, error } = await supabase.auth.signUp({
+      const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          emailRedirectTo: redirectUrl,
-        },
       });
-      if (error) {
-        showMessage(error.message, true);
+      if (signUpError) {
+        showMessage(signUpError.message, true);
         return;
       }
-      if (data?.user) {
-        showMessage("注册成功，请查收验证邮件并登录");
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (signInError) {
+        showMessage(signInError.message, true);
+        return;
       }
+
+      showMessage("注册成功，正在跳转…");
+      window.location.href = "index.html";
     });
   </script>
 </body>
