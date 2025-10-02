@@ -34,6 +34,8 @@ export function initWeeklyPlanner({
   let selectedWeek = 0;
   const selectedStudentIds = new Set();
 
+  function renderStudents() {}
+
   function normalizeWeekValue(weekValue) {
     if (!weekValue || typeof weekValue !== "object") return;
     if (typeof weekValue.sets !== "string") weekValue.sets = weekValue.sets == null ? "" : String(weekValue.sets);
