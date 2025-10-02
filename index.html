@@ -19,6 +19,7 @@
   <main class="page">
     <div class="tab-bar">
       <button class="tab-btn active" data-tab="general">中周期</button>
+      <button class="tab-btn" data-tab="weekly">周计划</button>
       <button class="tab-btn" data-tab="macro">总计划</button>
     </div>
 
@@ -41,6 +42,22 @@
 
       <section class="schedule-wrapper">
         <div id="days-container" class="days-container"></div>
+      </section>
+    </section>
+
+    <section class="tab-panel" data-panel="weekly">
+      <section class="weekly-card">
+        <header class="weekly-header">
+          <div class="week-input-group">
+            <label for="weekly-week">选择周：</label>
+            <input type="number" id="weekly-week" min="1" value="1" />
+          </div>
+          <div class="week-nav">
+            <button id="weekly-prev" type="button">上一周</button>
+            <button id="weekly-next" type="button">下一周</button>
+          </div>
+        </header>
+        <div id="weekly-container" class="weekly-container"></div>
       </section>
     </section>
 

@@ -9,6 +9,7 @@ export function initGeneralPlanner({
   syncWeekValues,
   persistSchedule,
   generateId,
+  onScheduleChange = () => {},
 }) {
   const {
     weekInput,
@@ -25,12 +26,67 @@ export function initGeneralPlanner({
   }
 
   let activeForm = null;
+  const extraColumnsPerWeek = 1;
 
   function closeActiveForm() {
     if (activeForm && activeForm.parentElement) {
       activeForm.parentElement.removeChild(activeForm);
     }
     activeForm = null;
+  }
+
+  function normalizeWeekValue(weekValue) {
+    if (!weekValue || typeof weekValue !== "object") return;
+    if (typeof weekValue.sets !== "string") weekValue.sets = weekValue.sets == null ? "" : String(weekValue.sets);
+    if (typeof weekValue.reps !== "string") weekValue.reps = weekValue.reps == null ? "" : String(weekValue.reps);
+    if (typeof weekValue.weight !== "string") weekValue.weight = weekValue.weight == null ? "" : String(weekValue.weight);
+    if (typeof weekValue.rpe !== "string") weekValue.rpe = weekValue.rpe == null ? "" : String(weekValue.rpe);
+    if (!Array.isArray(weekValue.setLog)) weekValue.setLog = [];
+  }
+
+  function ensureSetLogLength(weekValue) {
+    normalizeWeekValue(weekValue);
+    const totalSets = Number.parseInt(weekValue.sets, 10);
+    if (Number.isNaN(totalSets) || totalSets <= 0) {
+      weekValue.setLog = [];
+      return;
+    }
+    const defaultWeight = weekValue.weight || "";
+    while (weekValue.setLog.length < totalSets) {
+      weekValue.setLog.push({ done: false, weight: defaultWeight });
+    }
+    if (weekValue.setLog.length > totalSets) {
+      weekValue.setLog.length = totalSets;
+    }
+    weekValue.setLog.forEach((set) => {
+      if (typeof set.done !== "boolean") set.done = Boolean(set.done);
+      if (typeof set.weight !== "string") {
+        set.weight = set.weight == null ? "" : String(set.weight);
+      }
+      if (!set.weight && defaultWeight) set.weight = defaultWeight;
+    });
+  }
+
+  function resolveWeekContext(dayIndex, entryId, actionId, weekIndex) {
+    const schedule = state.schedule;
+    const day = schedule.dayData[dayIndex];
+    if (!day) return {};
+    const entry = day.entries.find((item) => item.id === entryId);
+    if (!entry) return {};
+    const action = entry.actions.find((item) => item.id === actionId);
+    if (!action) return {};
+    let weekValue = action.weekValues[weekIndex];
+    if (!weekValue) {
+      weekValue = action.weekValues[weekIndex] = createWeekValues(1)[0];
+    }
+    normalizeWeekValue(weekValue);
+    return { day, entry, action, weekValue };
+  }
+
+  function notifyChange({ rerender = false } = {}) {
+    persistSchedule();
+    onScheduleChange();
+    if (rerender) render();
   }
 
   function findType(typeId) {
@@ -56,21 +112,47 @@ export function initGeneralPlanner({
     if (Number.isNaN(dayIndex) || Number.isNaN(weekIndex) || !metric) return;
     if (!entryId || !actionId) return;
 
-    const schedule = state.schedule;
-    const day = schedule.dayData[dayIndex];
-    if (!day) return;
+    const { action, weekValue } = resolveWeekContext(dayIndex, entryId, actionId, weekIndex);
+    if (!action || !weekValue) return;
 
-    const entry = day.entries.find((item) => item.id === entryId);
-    if (!entry) return;
+    weekValue[metric] = input.value;
+    const requiresRerender = metric === "sets" || metric === "weight";
+    if (requiresRerender) {
+      ensureSetLogLength(weekValue);
+    }
+    notifyChange({ rerender: requiresRerender });
+  }
 
-    const action = entry.actions.find((item) => item.id === actionId);
-    if (!action || !Array.isArray(action.weekValues)) return;
+  function handleSetLogToggle(event) {
+    const checkbox = event.target;
+    if (!(checkbox instanceof HTMLInputElement)) return;
+    const dayIndex = Number.parseInt(checkbox.dataset.dayIndex, 10);
+    const weekIndex = Number.parseInt(checkbox.dataset.weekIndex, 10);
+    const setIndex = Number.parseInt(checkbox.dataset.setIndex, 10);
+    const entryId = checkbox.dataset.entryId;
+    const actionId = checkbox.dataset.actionId;
+    if ([dayIndex, weekIndex, setIndex].some(Number.isNaN) || !entryId || !actionId) return;
 
-    const values = action.weekValues[weekIndex];
-    if (!values) return;
+    const { weekValue } = resolveWeekContext(dayIndex, entryId, actionId, weekIndex);
+    if (!weekValue || !Array.isArray(weekValue.setLog) || !weekValue.setLog[setIndex]) return;
+    weekValue.setLog[setIndex].done = checkbox.checked;
+    notifyChange();
+  }
 
-    values[metric] = input.value;
-    persistSchedule();
+  function handleSetLogWeight(event) {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    const dayIndex = Number.parseInt(input.dataset.dayIndex, 10);
+    const weekIndex = Number.parseInt(input.dataset.weekIndex, 10);
+    const setIndex = Number.parseInt(input.dataset.setIndex, 10);
+    const entryId = input.dataset.entryId;
+    const actionId = input.dataset.actionId;
+    if ([dayIndex, weekIndex, setIndex].some(Number.isNaN) || !entryId || !actionId) return;
+
+    const { weekValue } = resolveWeekContext(dayIndex, entryId, actionId, weekIndex);
+    if (!weekValue || !Array.isArray(weekValue.setLog) || !weekValue.setLog[setIndex]) return;
+    weekValue.setLog[setIndex].weight = input.value;
+    notifyChange();
   }
 
   function openEntryForm(dayIndex, entry) {
@@ -250,7 +332,7 @@ export function initGeneralPlanner({
         });
       }
 
-      persistSchedule();
+      notifyChange({ rerender: false });
       closeActiveForm();
       render();
     });
@@ -347,8 +429,7 @@ export function initGeneralPlanner({
         const next = window.prompt("请输入新的训练日名称", current.title);
         if (next && next.trim().length > 0) {
           current.title = next.trim();
-          persistSchedule();
-          render();
+          notifyChange({ rerender: true });
         }
       });
 
@@ -371,7 +452,7 @@ export function initGeneralPlanner({
       const dayRow = document.createElement("tr");
       const dayCell = document.createElement("th");
       dayCell.className = "day-heading-cell";
-      dayCell.colSpan = 3 + metrics.length * schedule.weeks;
+      dayCell.colSpan = 3 + (metrics.length + extraColumnsPerWeek) * schedule.weeks;
       dayCell.textContent = day.title;
       dayRow.appendChild(dayCell);
       thead.appendChild(dayRow);
@@ -387,10 +468,11 @@ export function initGeneralPlanner({
       actionHeader.textContent = "训练动作";
       headerRow.appendChild(actionHeader);
 
+      const columnsPerWeek = metrics.length + extraColumnsPerWeek;
       for (let weekIndex = 0; weekIndex < schedule.weeks; weekIndex += 1) {
         const weekHeader = document.createElement("th");
         weekHeader.className = "week-heading";
-        weekHeader.colSpan = metrics.length;
+        weekHeader.colSpan = columnsPerWeek;
         weekHeader.textContent = `第${weekIndex + 1}周`;
         headerRow.appendChild(weekHeader);
       }
@@ -409,6 +491,9 @@ export function initGeneralPlanner({
             metricTh.textContent = metric.label;
             subRow.appendChild(metricTh);
           });
+          const logTh = document.createElement("th");
+          logTh.textContent = "完成情况";
+          subRow.appendChild(logTh);
         }
         thead.appendChild(subRow);
       }
@@ -420,7 +505,7 @@ export function initGeneralPlanner({
       if (!Array.isArray(day.entries) || day.entries.length === 0) {
         const emptyRow = document.createElement("tr");
         const emptyCell = document.createElement("td");
-        emptyCell.colSpan = 3 + metrics.length * schedule.weeks;
+        emptyCell.colSpan = 3 + (metrics.length + extraColumnsPerWeek) * schedule.weeks;
         emptyCell.className = "empty-cell";
         emptyCell.textContent = "暂未添加训练条目";
         emptyRow.appendChild(emptyCell);
@@ -467,8 +552,7 @@ export function initGeneralPlanner({
                 const currentDay = schedule.dayData[dayIndex];
                 if (!currentDay) return;
                 currentDay.entries = currentDay.entries.filter((item) => item.id !== entry.id);
-                persistSchedule();
-                render();
+                notifyChange({ rerender: true });
               });
 
               controlRow.appendChild(editBtn);
@@ -505,6 +589,16 @@ export function initGeneralPlanner({
             row.appendChild(actionCell);
 
             for (let weekIndex = 0; weekIndex < schedule.weeks; weekIndex += 1) {
+              const existing = action.weekValues ? action.weekValues[weekIndex] : null;
+              let weekValue = existing;
+              if (!weekValue) {
+                weekValue = action.placeholder
+                  ? createWeekValues(1)[0]
+                  : (action.weekValues[weekIndex] = createWeekValues(1)[0]);
+              }
+              normalizeWeekValue(weekValue);
+              ensureSetLogLength(weekValue);
+
               metrics.forEach((metric) => {
                 const cell = document.createElement("td");
                 cell.className = "value-cell";
@@ -513,7 +607,7 @@ export function initGeneralPlanner({
                   cell.textContent = "—";
                   cell.classList.add("muted");
                 } else {
-                  const value = action.weekValues[weekIndex]?.[metric.key] ?? "";
+                  const value = weekValue[metric.key] ?? "";
                   const input = document.createElement("input");
                   input.type = "text";
                   input.value = value;
@@ -529,6 +623,52 @@ export function initGeneralPlanner({
 
                 row.appendChild(cell);
               });
+
+              const logCell = document.createElement("td");
+              logCell.className = "set-log-cell";
+
+              if (action.placeholder || !weekValue.setLog.length) {
+                logCell.textContent = "—";
+                logCell.classList.add("muted");
+              } else {
+                const list = document.createElement("div");
+                list.className = "set-log-list";
+                weekValue.setLog.forEach((setEntry, setIndex) => {
+                  const setRow = document.createElement("div");
+                  setRow.className = "set-log-row";
+
+                  const checkbox = document.createElement("input");
+                  checkbox.type = "checkbox";
+                  checkbox.checked = Boolean(setEntry.done);
+                  checkbox.dataset.dayIndex = String(dayIndex);
+                  checkbox.dataset.entryId = entry.id;
+                  checkbox.dataset.actionId = action.id;
+                  checkbox.dataset.weekIndex = String(weekIndex);
+                  checkbox.dataset.setIndex = String(setIndex);
+                  checkbox.addEventListener("change", handleSetLogToggle);
+
+                  const label = document.createElement("span");
+                  label.textContent = `第${setIndex + 1}组`;
+
+                  const weightInput = document.createElement("input");
+                  weightInput.type = "text";
+                  weightInput.value = setEntry.weight ?? "";
+                  weightInput.dataset.dayIndex = String(dayIndex);
+                  weightInput.dataset.entryId = entry.id;
+                  weightInput.dataset.actionId = action.id;
+                  weightInput.dataset.weekIndex = String(weekIndex);
+                  weightInput.dataset.setIndex = String(setIndex);
+                  weightInput.addEventListener("input", handleSetLogWeight);
+
+                  setRow.appendChild(checkbox);
+                  setRow.appendChild(label);
+                  setRow.appendChild(weightInput);
+                  list.appendChild(setRow);
+                });
+                logCell.appendChild(list);
+              }
+
+              row.appendChild(logCell);
             }
 
             tbody.appendChild(row);
@@ -546,7 +686,7 @@ export function initGeneralPlanner({
     daysContainer.appendChild(fragment);
 
     if (changed) {
-      persistSchedule();
+      notifyChange();
     }
   }
 
@@ -558,8 +698,7 @@ export function initGeneralPlanner({
     }
     state.schedule.weeks = parsed;
     if (weekInput) weekInput.value = String(parsed);
-    persistSchedule();
-    render();
+    notifyChange({ rerender: true });
   }
 
   function applyDayCount(value) {
@@ -570,8 +709,7 @@ export function initGeneralPlanner({
     }
     state.schedule.days = parsed;
     if (dayInput) dayInput.value = String(parsed);
-    persistSchedule();
-    render();
+    notifyChange({ rerender: true });
   }
 
   if (setWeeksBtn) setWeeksBtn.addEventListener("click", () => applyWeekCount(weekInput.value));

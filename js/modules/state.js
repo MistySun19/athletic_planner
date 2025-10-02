@@ -4,7 +4,7 @@ import { FOCUS_CATEGORIES, TOTAL_WEEKS } from "./constants.js";
 export function createWeekValues(count) {
   const values = [];
   for (let i = 0; i < count; i += 1) {
-    values.push({ sets: "", reps: "", weight: "" });
+    values.push({ sets: "", reps: "", weight: "", rpe: "", setLog: [] });
   }
   return values;
 }
@@ -229,7 +229,7 @@ export function syncWeekValues(schedule) {
         if (action.weekValues.length < schedule.weeks) {
           const missing = schedule.weeks - action.weekValues.length;
           for (let i = 0; i < missing; i += 1) {
-            action.weekValues.push({ sets: "", reps: "", weight: "" });
+            action.weekValues.push({ sets: "", reps: "", weight: "", rpe: "", setLog: [] });
           }
           changed = true;
         } else if (action.weekValues.length > schedule.weeks) {
@@ -239,13 +239,15 @@ export function syncWeekValues(schedule) {
 
         action.weekValues.forEach((values, index) => {
           if (!values || typeof values !== "object") {
-            action.weekValues[index] = { sets: "", reps: "", weight: "" };
+            action.weekValues[index] = { sets: "", reps: "", weight: "", rpe: "", setLog: [] };
             changed = true;
             return;
           }
           if (typeof values.sets !== "string") values.sets = "";
           if (typeof values.reps !== "string") values.reps = "";
           if (typeof values.weight !== "string") values.weight = "";
+          if (typeof values.rpe !== "string") values.rpe = "";
+          if (!Array.isArray(values.setLog)) values.setLog = [];
         });
       });
     });

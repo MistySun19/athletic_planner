@@ -2,6 +2,7 @@ export const METRICS = [
   { key: "sets", label: "组数" },
   { key: "reps", label: "次数" },
   { key: "weight", label: "重量" },
+  { key: "rpe", label: "RPE" },
 ];
 
 export const TOTAL_WEEKS = 53;

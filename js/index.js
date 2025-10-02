@@ -1,23 +1,14 @@
 import { supabase } from "./supabaseClient.js";
 import { generateId } from "./storage.js";
-import {
-  METRICS,
-  TOTAL_WEEKS,
-  DAYS,
-  MONTH_NAMES,
-  PHASE_OPTIONS,
-  FOCUS_CATEGORIES,
-} from "./modules/constants.js";
+import { METRICS } from "./modules/constants.js";
 import {
   createWeekValues,
   getDefaultSchedule,
   ensureScheduleStructure,
   syncWeekValues,
-  ensureMacroPlanStructure,
 } from "./modules/state.js";
-import { parseISODate, getISOWeekNumber, moveArrayItem, removeArrayItem } from "./modules/helpers.js";
 import { initGeneralPlanner } from "./modules/generalPlanner.js";
-import { initMacroPlanner } from "./modules/macroPlanner.js";
+import { initWeeklyPlanner } from "./modules/weeklyPlanner.js";
 
 const state = {
   currentUser: null,
@@ -36,21 +27,14 @@ const elementsGeneral = {
   daysContainer: document.getElementById("days-container"),
 };
 
-const elementsMacro = {
-  macroStartInput: document.getElementById("macro-start-date"),
-  macroNameInput: document.getElementById("macro-name"),
-  macroNotesInput: document.getElementById("macro-notes"),
-  macrocycleListEl: document.getElementById("macrocycle-list"),
-  addMacrocycleBtn: document.getElementById("add-macrocycle"),
-  mesocycleListEl: document.getElementById("mesocycle-list"),
-  addMesocycleBtn: document.getElementById("add-mesocycle"),
-  macroTimelineEl: document.getElementById("macro-timeline"),
-  workloadPerformanceInput: document.getElementById("workload-performance"),
-  workloadLoadPlusInput: document.getElementById("workload-load-plus"),
-  workloadLoadInput: document.getElementById("workload-load"),
-  workloadBaseInput: document.getElementById("workload-base"),
-  workloadDeloadInput: document.getElementById("workload-deload"),
+const elementsWeekly = {
+  weekInput: document.getElementById("weekly-week"),
+  prevBtn: document.getElementById("weekly-prev"),
+  nextBtn: document.getElementById("weekly-next"),
+  container: document.getElementById("weekly-container"),
 };
+
+let weeklyPlanner;
 
 const generalPlanner = initGeneralPlanner({
   state,
@@ -61,15 +45,20 @@ const generalPlanner = initGeneralPlanner({
   syncWeekValues,
   persistSchedule,
   generateId,
+  onScheduleChange: () => {
+    if (weeklyPlanner) weeklyPlanner.render();
+  },
 });
 
-const macroPlanner = initMacroPlanner({
+weeklyPlanner = initWeeklyPlanner({
   state,
-  elements: elementsMacro,
-  constants: { TOTAL_WEEKS, DAYS, MONTH_NAMES, PHASE_OPTIONS, FOCUS_CATEGORIES },
-  helpers: { parseISODate, getISOWeekNumber, moveArrayItem, removeArrayItem },
-  ensureMacroPlanStructure,
+  elements: elementsWeekly,
+  metrics: METRICS,
+  createWeekValues,
   persistSchedule,
+  onScheduleChange: () => {
+    generalPlanner.render();
+  },
 });
 
 const signOutBtn = document.getElementById("sign-out");
@@ -83,7 +72,7 @@ window.addEventListener("focus", () => {
   if (!state.currentUser) return;
   loadTypes().then(() => {
     generalPlanner.render();
-    macroPlanner.render();
+    if (weeklyPlanner) weeklyPlanner.render();
   });
 });
 
@@ -95,7 +84,6 @@ async function init() {
 
   ensureScheduleStructure(state.schedule);
   syncWeekValues(state.schedule);
-  ensureMacroPlanStructure(state.schedule);
 
   if (elementsGeneral.weekInput) {
     elementsGeneral.weekInput.value = String(state.schedule.weeks);
@@ -105,7 +93,7 @@ async function init() {
   }
 
   generalPlanner.render();
-  macroPlanner.render();
+  if (weeklyPlanner) weeklyPlanner.render();
 }
 
 function persistSchedule() {
