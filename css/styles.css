@@ -1445,16 +1445,40 @@ button.secondary:hover {
   gap: 0.3rem;
 }
 
-.student-rpe-badge {
+
+.set-log-summary {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.set-log-summary-rpe {
   display: inline-flex;
   align-items: center;
   gap: 0.2rem;
-  padding: 0.12rem 0.45rem;
+  padding: 0.15rem 0.5rem;
   border-radius: 999px;
   background: rgba(3, 201, 136, 0.15);
   color: #038b5f;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-weight: 600;
+  width: fit-content;
+}
+
+.set-log-summary-sets {
+  margin: 0;
+  padding-left: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.set-log-summary-sets li.done {
+  color: #038b5f;
 }
 
 .value-input:focus {

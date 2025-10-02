@@ -618,18 +618,7 @@ export function initGeneralPlanner({
                 input.dataset.weekIndex = String(weekIndex);
                 input.dataset.metric = metric.key;
                 input.addEventListener("input", handleMetricInput);
-                const wrapper = document.createElement("div");
-                wrapper.className = "value-wrapper";
-                wrapper.appendChild(input);
-
-                if (metric.key === "rpe" && weekValue.studentProgress?.rpe) {
-                  const badge = document.createElement("span");
-                  badge.className = "student-rpe-badge";
-                  badge.textContent = `学生 RPE：${weekValue.studentProgress.rpe}`;
-                  wrapper.appendChild(badge);
-                }
-
-                cell.appendChild(wrapper);
+                cell.appendChild(input);
               }
 
               row.appendChild(cell);
@@ -638,47 +627,75 @@ export function initGeneralPlanner({
               const logCell = document.createElement("td");
               logCell.className = "set-log-cell";
 
-              if (action.placeholder || !weekValue.setLog.length) {
+              if (action.placeholder) {
                 logCell.textContent = "—";
                 logCell.classList.add("muted");
               } else {
-                const list = document.createElement("div");
-                list.className = "set-log-list";
-                weekValue.setLog.forEach((setEntry, setIndex) => {
-                  const setRow = document.createElement("div");
-                  setRow.className = "set-log-row";
+                if (!weekValue.setLog.length) {
+                  logCell.textContent = "—";
+                  logCell.classList.add("muted");
+                } else {
+                  const list = document.createElement("div");
+                  list.className = "set-log-list";
+                  weekValue.setLog.forEach((setEntry, setIndex) => {
+                    const setRow = document.createElement("div");
+                    setRow.className = "set-log-row";
 
-                  const checkbox = document.createElement("input");
-                  checkbox.type = "checkbox";
-                  checkbox.checked = Boolean(setEntry.done);
-                  checkbox.dataset.dayIndex = String(dayIndex);
-                  checkbox.dataset.entryId = entry.id;
-                  checkbox.dataset.actionId = action.id;
-                  checkbox.dataset.weekIndex = String(weekIndex);
-                  checkbox.dataset.setIndex = String(setIndex);
-                  checkbox.addEventListener("change", handleSetLogToggle);
+                    const checkbox = document.createElement("input");
+                    checkbox.type = "checkbox";
+                    checkbox.checked = Boolean(setEntry.done);
+                    checkbox.dataset.dayIndex = String(dayIndex);
+                    checkbox.dataset.entryId = entry.id;
+                    checkbox.dataset.actionId = action.id;
+                    checkbox.dataset.weekIndex = String(weekIndex);
+                    checkbox.dataset.setIndex = String(setIndex);
+                    checkbox.addEventListener("change", handleSetLogToggle);
 
-                  const label = document.createElement("span");
-                  label.textContent = `第${setIndex + 1}组`;
+                    const label = document.createElement("span");
+                    label.textContent = `第${setIndex + 1}组`;
 
-                  const weightInput = document.createElement("input");
-                  weightInput.type = "text";
-                  weightInput.value = setEntry.weight ?? "";
-                  weightInput.dataset.dayIndex = String(dayIndex);
-                  weightInput.dataset.entryId = entry.id;
-                  weightInput.dataset.actionId = action.id;
-                  weightInput.dataset.weekIndex = String(weekIndex);
-                  weightInput.dataset.setIndex = String(setIndex);
-                  weightInput.addEventListener("input", handleSetLogWeight);
+                    const weightInput = document.createElement("input");
+                    weightInput.type = "text";
+                    weightInput.value = setEntry.weight ?? "";
+                    weightInput.dataset.dayIndex = String(dayIndex);
+                    weightInput.dataset.entryId = entry.id;
+                    weightInput.dataset.actionId = action.id;
+                    weightInput.dataset.weekIndex = String(weekIndex);
+                    weightInput.dataset.setIndex = String(setIndex);
+                    weightInput.addEventListener("input", handleSetLogWeight);
 
-                  setRow.appendChild(checkbox);
-                  setRow.appendChild(label);
-                  setRow.appendChild(weightInput);
-                  list.appendChild(setRow);
-                });
-                logCell.appendChild(list);
+                    setRow.appendChild(checkbox);
+                    setRow.appendChild(label);
+                    setRow.appendChild(weightInput);
+                    list.appendChild(setRow);
+                  });
+                  logCell.appendChild(list);
+                }
+
+                const progress = weekValue.studentProgress;
+                if (progress) {
+                  const summary = document.createElement("div");
+                  summary.className = "set-log-summary";
+                  if (progress.rpe) {
+                    const badge = document.createElement("span");
+                    badge.className = "set-log-summary-rpe";
+                    badge.textContent = `学生 RPE：${progress.rpe}`;
+                    summary.appendChild(badge);
+                  }
+                  if (Array.isArray(progress.sets) && progress.sets.length) {
+                    const summaryList = document.createElement("ul");
+                    summaryList.className = "set-log-summary-sets";
+                    progress.sets.forEach((done, idx) => {
+                      const item = document.createElement("li");
+                      item.textContent = `第${idx + 1}组：${done ? "已完成" : "未完成"}`;
+                      item.classList.toggle("done", Boolean(done));
+                      summaryList.appendChild(item);
+                    });
+                    summary.appendChild(summaryList);
+                  }
+                  logCell.appendChild(summary);
+                }
               }
-
               row.appendChild(logCell);
             }
 
