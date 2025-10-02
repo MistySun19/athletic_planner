@@ -75,9 +75,16 @@
             <button id="bind-student" type="submit">添加学生</button>
           </form>
           <p id="student-bind-message" class="tip" role="status" aria-live="polite"></p>
+          <label class="student-select">
+            当前学生
+            <select id="student-select">
+              <option value="">请选择学生</option>
+            </select>
+          </label>
+          <p id="student-select-message" class="tip" role="status" aria-live="polite"></p>
           <div id="student-list" class="student-list"></div>
           <div class="student-actions">
-            <button id="sync-week" type="button">同步当前周计划</button>
+            <button id="publish-week" type="button">发布当前学生周计划</button>
           </div>
         </section>
 

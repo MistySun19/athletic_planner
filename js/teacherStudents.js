@@ -22,47 +22,9 @@ function formatStudentDisplay(profile) {
   return profile.email ?? "未知学生";
 }
 
-function buildWeekPlanSnapshot(schedule, weekIndex) {
-  if (!schedule || typeof schedule !== "object") return null;
-  const safeWeek = Number.isFinite(weekIndex) ? weekIndex : 0;
-  const days = (schedule.dayData || []).map((day) => {
-    const entries = (day.entries || []).map((entry) => {
-      const actions = (entry.actions || []).map((action) => {
-        const weekValues = Array.isArray(action.weekValues)
-          ? action.weekValues[safeWeek] || null
-          : null;
-        return {
-          id: action.id,
-          actionId: action.actionId,
-          actionName: action.actionName,
-          weekValue: weekValues,
-        };
-      });
-      return {
-        id: entry.id,
-        typeName: entry.typeName,
-        groupLabel: entry.groupLabel,
-        actions,
-      };
-    });
-    return {
-      id: day.id,
-      title: day.title,
-      entries,
-    };
-  });
-
-  return {
-    weekIndex: safeWeek,
-    generatedAt: new Date().toISOString(),
-    days,
-  };
-}
-
 export function initTeacherStudents({
   state,
   elements,
-  getSelectedWeek = () => 0,
   onStudentsChange = () => {},
 }) {
   if (!elements?.form || !elements?.list) return;
@@ -242,68 +204,6 @@ export function initTeacherStudents({
     showMessage(elements.message, "已成功绑定学生。");
     loadStudents();
   });
-
-  if (elements.syncButton) {
-    elements.syncButton.addEventListener("click", async () => {
-      if (!local.students.length) {
-        showMessage(elements.message, "尚未绑定学生，无法分发周计划。", true);
-        return;
-      }
-      const weekIndex = getSelectedWeek();
-      const snapshot = buildWeekPlanSnapshot(state.schedule, weekIndex);
-      if (!snapshot || !snapshot.days.length) {
-        showMessage(elements.message, "周计划为空，请先在上方填写后再分发。", true);
-        return;
-      }
-
-      showMessage(elements.message, "正在分发周计划…");
-
-      const { data: planData, error: planError } = await supabase
-        .from("weekly_plans")
-        .upsert(
-          {
-            teacher_id: state.currentUser.id,
-            week_number: weekIndex + 1,
-            schedule_snapshot: snapshot,
-            published_at: new Date().toISOString(),
-          },
-          { onConflict: "teacher_id,week_number" }
-        )
-        .select("id")
-        .maybeSingle();
-
-      if (planError) {
-        console.error("发布周计划失败", planError);
-        showMessage(elements.message, "发布周计划失败：" + planError.message, true);
-        return;
-      }
-
-      if (!planData?.id) {
-        showMessage(elements.message, "未能创建周计划记录", true);
-        return;
-      }
-
-      const assignments = local.students.map((student) => ({
-        plan_id: planData.id,
-        student_id: student.student_id,
-        teacher_id: state.currentUser.id,
-        status: "assigned",
-      }));
-
-      const { error: assignmentError } = await supabase
-        .from("weekly_plan_assignments")
-        .upsert(assignments, { onConflict: "plan_id,student_id" });
-
-      if (assignmentError) {
-        console.error("分发周计划失败", assignmentError);
-        showMessage(elements.message, "分发周计划失败：" + assignmentError.message, true);
-        return;
-      }
-
-      showMessage(elements.message, "周计划已分发给绑定学生。");
-      onStudentsChange([...local.students]);
-    });
-  }
 
   loadStudents();
 

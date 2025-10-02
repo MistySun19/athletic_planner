@@ -854,6 +854,20 @@ button.secondary:hover {
   background: #f9fbff;
 }
 
+.student-select {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+.student-select select {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: #fff;
+}
+
 .bind-form {
   display: flex;
   flex-wrap: wrap;
