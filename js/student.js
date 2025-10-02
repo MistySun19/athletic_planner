@@ -291,8 +291,8 @@ async function fetchLatestPlan() {
     .from("weekly_plans")
     .select("id, teacher_id, student_id, week_number, published_at, schedule_snapshot")
     .eq("student_id", currentUser.id)
-    .order("week_number", { ascending: false })
     .order("published_at", { ascending: false, nullsLast: true })
+    .order("week_number", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -412,13 +412,34 @@ async function handleSubmit(event) {
     updated_at: new Date().toISOString(),
   };
 
-  const { error } = await supabase
-    .from("weekly_progress")
-    .upsert(payload, { onConflict: "assignment_id" });
+  try {
+    const { data: existing, error: existingError } = await supabase
+      .from("weekly_progress")
+      .select("id")
+      .eq("assignment_id", currentAssignment.id)
+      .maybeSingle();
 
-  if (error) {
+    if (existingError && existingError.code !== "PGRST116") {
+      throw existingError;
+    }
+
+    if (existing?.id) {
+      const { error: updateError } = await supabase
+        .from("weekly_progress")
+        .update({ content, updated_at: payload.updated_at })
+        .eq("id", existing.id);
+
+      if (updateError) throw updateError;
+    } else {
+      const { error: insertError } = await supabase
+        .from("weekly_progress")
+        .insert(payload);
+
+      if (insertError) throw insertError;
+    }
+  } catch (error) {
     console.error("提交完成情况失败", error);
-    showProgressMessage("提交失败：" + error.message, true);
+    showProgressMessage("提交失败：" + (error.message || "未知错误"), true);
     return;
   }
 
