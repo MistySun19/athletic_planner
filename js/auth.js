@@ -30,10 +30,12 @@ export async function fetchProfile(userId) {
       const { data: userData } = await supabase.auth.getUser();
       const user = userData?.user;
       if (user && user.id === userId) {
+        const fallbackRole =
+          user.user_metadata?.role || user.user_metadata?.requested_role || ROLE.student;
         return {
           id: user.id,
           email: user.email,
-          role: user.user_metadata?.role || ROLE.student,
+          role: fallbackRole,
           full_name: user.user_metadata?.full_name ?? null,
         };
       }
@@ -53,13 +55,23 @@ export async function fetchProfile(userId) {
 export async function upsertProfile(user, role = ROLE.student) {
   if (!user) return null;
   let resolvedRole = role;
+  const metadataRole =
+    user.user_metadata?.role || user.user_metadata?.requested_role || null;
   try {
     const existing = await fetchProfile(user.id);
     if (existing?.role) {
       resolvedRole = existing.role;
+    } else if (metadataRole) {
+      resolvedRole = metadataRole;
     }
   } catch (error) {
     console.warn("查询现有档案失败，将使用默认角色", error);
+    if (metadataRole) {
+      resolvedRole = metadataRole;
+    }
+  }
+  if (!metadataRole && resolvedRole === ROLE.student && user.user_metadata?.requested_role) {
+    resolvedRole = user.user_metadata.requested_role;
   }
   const normalizedEmail = (user.email || "").toLowerCase();
   if (normalizedEmail === DEFAULT_ADMIN_EMAIL) {
@@ -98,8 +110,9 @@ export async function upsertProfile(user, role = ROLE.student) {
     throw error;
   }
 
-  const metadataRole = user.user_metadata?.role;
-  if (metadataRole !== resolvedRole) {
+  const metadataRoleFinal =
+    user.user_metadata?.role || user.user_metadata?.requested_role || null;
+  if (metadataRoleFinal !== resolvedRole) {
     await supabase.auth.updateUser({ data: { role: resolvedRole } });
   }
 
@@ -139,7 +152,9 @@ export async function requireRole(allowedRoles) {
   try {
     profile = await fetchProfile(user.id);
     if (!profile) {
-      profile = await upsertProfile(user);
+      const preferredRole =
+        user.user_metadata?.role || user.user_metadata?.requested_role || ROLE.student;
+      profile = await upsertProfile(user, preferredRole);
     }
   } catch (error) {
     console.error("加载/创建用户档案失败", error);

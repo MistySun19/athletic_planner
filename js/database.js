@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient.js";
+import { ROLE, requireRole } from "./auth.js";
 
 const typeInput = document.getElementById("new-type");
 const addTypeBtn = document.getElementById("add-type");
@@ -6,8 +7,10 @@ const typeList = document.getElementById("type-list");
 const typeTemplate = document.getElementById("type-template");
 const actionTemplate = document.getElementById("action-template");
 const signOutBtn = document.getElementById("sign-out");
+const adminLink = document.getElementById("admin-link");
 
 let currentUser = null;
+let currentProfile = null;
 let types = [];
 
 function clearElement(element) {
@@ -15,15 +18,6 @@ function clearElement(element) {
   while (element.firstChild) {
     element.removeChild(element.firstChild);
   }
-}
-
-async function requireUser() {
-  const result = await supabase.auth.getUser();
-  if (result.error || !result.data?.user) {
-    window.location.href = "login.html";
-    throw result.error || new Error("未登录");
-  }
-  return result.data.user;
 }
 
 async function fetchTypes() {
@@ -205,7 +199,13 @@ if (signOutBtn) {
 }
 
 async function init() {
-  currentUser = await requireUser();
+  const session = await requireRole([ROLE.teacher, ROLE.admin]);
+  if (!session) return;
+  currentUser = session.user;
+  currentProfile = session.profile;
+  if (adminLink) {
+    adminLink.classList.toggle("hidden", currentProfile?.role !== ROLE.admin);
+  }
   fetchTypes();
 }
 

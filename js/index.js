@@ -1,6 +1,8 @@
 import { supabase } from "./supabaseClient.js";
+import { ROLE, requireRole, setUserRole } from "./auth.js";
 import { generateId } from "./storage.js";
 import { METRICS } from "./modules/constants.js";
+import { initTeacherStudents } from "./teacherStudents.js";
 import {
   createWeekValues,
   getDefaultSchedule,
@@ -15,6 +17,7 @@ const state = {
   scheduleRecordId: null,
   schedule: getDefaultSchedule(),
   database: { types: [] },
+  profile: null,
 };
 
 const elementsGeneral = {
@@ -34,7 +37,19 @@ const elementsWeekly = {
   container: document.getElementById("weekly-container"),
 };
 
+const elementsStudentManager = {
+  form: document.getElementById("bind-form"),
+  emailInput: document.getElementById("student-email"),
+  message: document.getElementById("student-bind-message"),
+  list: document.getElementById("student-list"),
+  syncButton: document.getElementById("sync-week"),
+};
+
+const adminLink = document.getElementById("admin-link");
+const requestAdminBtn = document.getElementById("request-admin");
+
 let weeklyPlanner;
+let teacherStudentManager;
 
 const generalPlanner = initGeneralPlanner({
   state,
@@ -61,6 +76,12 @@ weeklyPlanner = initWeeklyPlanner({
   },
 });
 
+teacherStudentManager = initTeacherStudents({
+  state,
+  elements: elementsStudentManager,
+  getSelectedWeek: () => weeklyPlanner?.getSelectedWeek?.() ?? 0,
+});
+
 const signOutBtn = document.getElementById("sign-out");
 const tabButtons = Array.from(document.querySelectorAll(".tab-btn"));
 const tabPanels = Array.from(document.querySelectorAll(".tab-panel"));
@@ -79,7 +100,12 @@ window.addEventListener("focus", () => {
 init();
 
 async function init() {
-  state.currentUser = await requireUser();
+  const session = await requireRole([ROLE.teacher, ROLE.admin]);
+  if (!session) return;
+  state.currentUser = session.user;
+  state.profile = session.profile;
+  applyRoleControls(session.profile);
+  bindAdminRequest();
   await Promise.all([loadTypes(), loadSchedule()]);
 
   ensureScheduleStructure(state.schedule);
@@ -94,6 +120,38 @@ async function init() {
 
   generalPlanner.render();
   if (weeklyPlanner) weeklyPlanner.render();
+  teacherStudentManager?.reload?.();
+}
+
+function applyRoleControls(profile) {
+  const isAdmin = profile?.role === ROLE.admin;
+  if (adminLink) {
+    adminLink.classList.toggle("hidden", !isAdmin);
+  }
+  if (requestAdminBtn) {
+    requestAdminBtn.classList.toggle("hidden", isAdmin);
+  }
+}
+
+function bindAdminRequest() {
+  if (!requestAdminBtn) return;
+  requestAdminBtn.addEventListener("click", async () => {
+    const answer = window.prompt("请输入管理员密码：");
+    if (answer == null) return;
+    if (answer !== "admin") {
+      window.alert("密码错误，无法升级为管理员。");
+      return;
+    }
+    try {
+      await setUserRole(state.currentUser.id, ROLE.admin);
+      state.profile = { ...state.profile, role: ROLE.admin };
+      applyRoleControls(state.profile);
+      window.alert("已升级为管理员，可访问管理员面板。");
+    } catch (error) {
+      console.error("升级管理员失败", error);
+      window.alert(error?.message || "升级管理员失败，请稍后再试。");
+    }
+  });
 }
 
 function persistSchedule() {
@@ -188,13 +246,4 @@ function bindSignOut() {
     await supabase.auth.signOut();
     window.location.href = "login.html";
   });
-}
-
-async function requireUser() {
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data?.user) {
-    window.location.href = "login.html";
-    throw (error || new Error("未登录"));
-  }
-  return data.user;
 }

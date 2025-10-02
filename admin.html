@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>管理员面板</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="top-bar">
+    <h1>管理员面板</h1>
+    <nav>
+      <a href="admin.html">用户管理</a>
+      <button id="admin-sign-out" type="button">退出登录</button>
+    </nav>
+  </header>
+
+  <main class="page admin-page">
+    <section class="admin-card">
+      <header class="admin-card-header">
+        <div>
+          <h2>教师列表</h2>
+          <p class="tip">查看与管理当前所有教师账户。</p>
+        </div>
+        <button id="refresh-teachers" type="button">刷新</button>
+      </header>
+      <div id="teachers-message" class="tip" role="status" aria-live="polite"></div>
+      <div id="teachers-list" class="admin-list"></div>
+    </section>
+
+    <section class="admin-card">
+      <header class="admin-card-header">
+        <div>
+          <h2>学生列表</h2>
+          <p class="tip">查看与管理当前所有学生账户。</p>
+        </div>
+        <button id="refresh-students" type="button">刷新</button>
+      </header>
+      <div id="students-message" class="tip" role="status" aria-live="polite"></div>
+      <div id="students-list" class="admin-list"></div>
+    </section>
+  </main>
+
+  <script type="module" src="js/admin.js"></script>
+</body>
+</html>

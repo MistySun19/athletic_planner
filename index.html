@@ -13,6 +13,8 @@
       <a href="index.html">表格制作</a>
       <a href="database.html">数据库管理</a>
       <a href="students.html">学生管理</a>
+      <a href="admin.html" id="admin-link" class="hidden">管理员面板</a>
+      <button id="request-admin" type="button" class="secondary hidden">申请管理员</button>
       <button id="sign-out" type="button">退出登录</button>
     </nav>
   </header>
@@ -72,6 +74,7 @@
             </label>
             <button id="bind-student" type="submit">添加学生</button>
           </form>
+          <p id="student-bind-message" class="tip" role="status" aria-live="polite"></p>
           <div id="student-list" class="student-list"></div>
           <div class="student-actions">
             <button id="sync-week" type="button">同步当前周计划</button>

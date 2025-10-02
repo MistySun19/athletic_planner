@@ -13,6 +13,7 @@
       <a href="index.html">表格制作</a>
       <a href="database.html">数据库管理</a>
       <a href="students.html">学生管理</a>
+      <a href="admin.html" id="admin-link" class="hidden">管理员面板</a>
       <button id="sign-out" type="button">退出登录</button>
     </nav>
   </header>
@@ -21,22 +22,22 @@
     <section class="student-admin-card">
       <header class="student-admin-header">
         <div>
-          <h2>学生列表</h2>
-          <p class="tip">集中维护学生邮箱，方便在训练计划中同步使用。</p>
+          <h2>学生管理</h2>
+          <p class="tip">添加和查看已绑定的学生，了解最新完成情况。</p>
         </div>
         <p id="student-admin-total" class="tip">共 0 名学生</p>
       </header>
 
-      <form id="student-admin-form" class="bind-form">
+      <form id="bind-form" class="bind-form">
         <label>
           学生邮箱
-          <input type="email" id="student-admin-email" placeholder="student@example.com" required />
+          <input type="email" id="student-email" placeholder="student@example.com" required />
         </label>
         <button type="submit">添加学生</button>
       </form>
-      <p id="student-admin-feedback" class="tip" role="status" aria-live="polite"></p>
+      <p id="student-bind-message" class="tip" role="status" aria-live="polite"></p>
 
-      <div id="student-admin-list" class="student-admin-list"></div>
+      <div id="student-list" class="student-admin-list"></div>
     </section>
   </main>
 

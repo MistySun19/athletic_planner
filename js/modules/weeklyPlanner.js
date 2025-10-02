@@ -347,5 +347,6 @@ export function initWeeklyPlanner({
   return {
     render,
     setWeek,
+    getSelectedWeek: () => selectedWeek,
   };
 }

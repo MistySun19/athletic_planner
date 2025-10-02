@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>我的周计划</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="top-bar">
+    <h1>我的训练计划</h1>
+    <nav>
+      <a href="student.html">当前周计划</a>
+      <button id="student-sign-out" type="button">退出登录</button>
+    </nav>
+  </header>
+
+  <main class="page student-page">
+    <section class="student-plan-card">
+      <header class="student-plan-header">
+        <div>
+          <h2 id="plan-title">当前周计划</h2>
+          <p id="plan-subtitle" class="tip"></p>
+        </div>
+        <button id="refresh-plan" type="button">刷新</button>
+      </header>
+
+      <div id="plan-message" class="tip" role="status" aria-live="polite"></div>
+      <div id="plan-container" class="student-plan-container"></div>
+    </section>
+
+    <section class="student-progress-card">
+      <header>
+        <h2>完成情况填写</h2>
+        <p class="tip">逐日填写完成情况，老师可以实时查看。</p>
+      </header>
+      <form id="progress-form" class="progress-form">
+        <div id="progress-fields"></div>
+        <button type="submit">提交完成情况</button>
+        <p id="progress-message" class="tip" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+  </main>
+
+  <script type="module" src="js/student.js"></script>
+</body>
+</html>
