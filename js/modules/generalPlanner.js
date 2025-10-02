@@ -618,14 +618,18 @@ export function initGeneralPlanner({
                 input.dataset.weekIndex = String(weekIndex);
                 input.dataset.metric = metric.key;
                 input.addEventListener("input", handleMetricInput);
-                cell.appendChild(input);
+                const wrapper = document.createElement("div");
+                wrapper.className = "value-wrapper";
+                wrapper.appendChild(input);
 
                 if (metric.key === "rpe" && weekValue.studentProgress?.rpe) {
                   const badge = document.createElement("span");
                   badge.className = "student-rpe-badge";
                   badge.textContent = `学生 RPE：${weekValue.studentProgress.rpe}`;
-                  cell.appendChild(badge);
+                  wrapper.appendChild(badge);
                 }
+
+                cell.appendChild(wrapper);
               }
 
               row.appendChild(cell);
